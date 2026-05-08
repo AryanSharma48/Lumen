@@ -1,300 +1,388 @@
 /**
  * Audit Engine — src/lib/engine.ts
  *
- * All pricing constants are intentionally isolated at the top so they can be
- * swapped for real market data (see PRICING_DATA.md) without touching logic.
- * Prices are per-seat/month unless marked as flat.
+ * All pricing constants are isolated at the top so they can be swapped for
+ * updated market data (see PRICING_DATA.md) without touching rule logic.
+ * Prices are per-seat / month for subscription tools.
+ * API tools (Anthropic API, OpenAI API) are usage-based; monthlySpend IS the cost.
  *
  * NO AI or external calls are made here. Every recommendation is derived
- * from deterministic comparisons.
+ * from deterministic arithmetic.
  */
 
 import type {
+  ActionType,
   AuditReport,
   AuditResult,
-  ActionType,
   FormState,
   PlanName,
+  TeamData,
   ToolName,
   ToolState,
-  UseCase,
 } from "@/types/audit";
 
-// ─── Placeholder Pricing Constants ────────────────────────────────────────────
-// TODO: Replace with finalized numbers from PRICING_DATA.md
+// ─── Verified Pricing Table (PRICING_DATA.md · 2026-05-08) ───────────────────
+// null = custom / negotiated — we cannot compute savings for these tiers.
 
-const PRICE: Record<ToolName, Partial<Record<PlanName, number>>> = {
-  Cursor: {
-    Hobby: 0,
-    Pro: 20,
-    Business: 40,
-    Enterprise: 60, // placeholder — negotiated, varies
-  },
-  "GitHub Copilot": {
-    Individual: 10,
-    Business: 19,
-    Enterprise: 39,
-  },
-  Claude: {
-    Free: 0,
-    Pro: 20,
-    Team: 25,   // per seat
-    Enterprise: 60, // placeholder
-  },
-  ChatGPT: {
-    Free: 0,
-    Plus: 20,
-    Team: 30,   // per seat
-    Enterprise: 60, // placeholder
-  },
-  "Anthropic API": {
-    "Pay-as-you-go": 0, // cost is usage-based; monthlySpend IS the cost
-  },
-  "OpenAI API": {
-    "Pay-as-you-go": 0, // same — we use monthlySpend directly
-  },
-  Gemini: {
-    Free: 0,
-    Advanced: 20,
-    Business: 24,
-    Enterprise: 30, // placeholder
-  },
-  Windsurf: {
-    Free: 0,
-    Pro: 15,
-    Teams: 22,
-    Enterprise: 45, // placeholder
-  },
+export const TOOL_PRICING: Record<string, Record<string, number | null>> = {
+  "Cursor":         { "Hobby": 0,  "Pro": 20, "Pro+": 60, "Business": 40, "Enterprise": null },
+  "GitHub Copilot": { "Free": 0,   "Individual": 10, "Pro+": 39, "Business": 19, "Enterprise": 39 },
+  "Claude":         { "Free": 0,   "Pro": 20, "Team": 30, "Enterprise": null },
+  "ChatGPT":        { "Free": 0,   "Plus": 20, "Pro": 200, "Team": 30, "Enterprise": null },
+  "Windsurf":       { "Free": 0,   "Pro": 20, "Teams": 40, "Enterprise": null },
+  // API tools — pricing recorded for reference; engine uses monthlySpend directly.
+  "Anthropic API":  { "Pay-as-you-go": 0 },
+  "OpenAI API":     { "Pay-as-you-go": 0 },
+  "Gemini":         { "Free": 0,   "Advanced": 19.99 },
 };
 
-/** Max team size where a per-seat plan is still the cheapest per-seat tier. */
-const ENTERPRISE_JUSTIFIED_SEAT_THRESHOLD = 50;
+// ─── Rule Thresholds ─────────────────────────────────────────────────────────
 
-/**
- * For "coding" use-cases, Cursor / Windsurf / Copilot are more appropriate
- * than general-purpose chat tools billed at a high per-seat rate.
- */
-const CODING_PREFERRED_TOOLS: ToolName[] = ["Cursor", "GitHub Copilot", "Windsurf"];
+/** Teams smaller than this don't justify a custom Enterprise contract. */
+const ENTERPRISE_SEAT_THRESHOLD = 50;
 
-/**
- * For "writing" / "research" use-cases, Claude and ChatGPT are better value
- * than code-specific IDEs.
- */
-const WRITING_PREFERRED_TOOLS: ToolName[] = ["Claude", "ChatGPT", "Gemini"];
+/** API spend above this triggers an efficiency suggestion (Rule 4). */
+const API_EFFICIENCY_THRESHOLD = 100;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/** Conservative savings estimate for switching to a cheaper API model (Rule 4). */
+const API_EFFICIENCY_SAVINGS_RATE = 0.5;
 
-function planPrice(tool: ToolName, plan: PlanName): number {
-  return PRICE[tool]?.[plan] ?? 0;
+// ─── Normalisation Helpers ───────────────────────────────────────────────────
+// The type system allows both the legacy (toolName/planName/useCase) and the
+// new (name/plan/primaryUseCase) field names. These helpers resolve either.
+
+function resolveName(tool: ToolState): ToolName {
+  return tool.name ?? tool.toolName!;
 }
 
-/** Returns the monthly total for a tool at a given plan and seat count. */
-function totalCost(pricePerSeat: number, seats: number): number {
-  return pricePerSeat * seats;
+function resolvePlan(tool: ToolState): PlanName {
+  return tool.plan ?? tool.planName!;
 }
 
+function resolveUseCase(team: TeamData) {
+  return team.primaryUseCase ?? team.useCase!;
+}
+
+// ─── Internal Helpers ────────────────────────────────────────────────────────
+
 /**
- * Finds the cheapest plan for a tool that is not the current plan.
- * Returns null if the current plan is already the cheapest (or only) option.
+ * Looks up the per-seat price for a tool+plan combination.
+ * Returns null when the price is custom/unknown.
  */
-function cheaperPlan(
-  tool: ToolName,
-  currentPlan: PlanName,
-  seats: number,
-  currentTotal: number
-): { plan: PlanName; total: number } | null {
-  const plans = PRICE[tool];
-  if (!plans) return null;
-
-  let best: { plan: PlanName; total: number } | null = null;
-
-  for (const [plan, pricePerSeat] of Object.entries(plans) as [PlanName, number][]) {
-    if (plan === currentPlan) continue;
-    if (pricePerSeat === 0) continue; // free plans are separate logic
-    const t = totalCost(pricePerSeat, seats);
-    if (t < currentTotal && (best === null || t < best.total)) {
-      best = { plan, total: t };
-    }
-  }
-
-  return best;
+function perSeatPrice(toolName: string, plan: string): number | null {
+  return TOOL_PRICING[toolName]?.[plan] ?? null;
 }
 
 /**
- * Checks whether the user is on an Enterprise/high tier with a very small
- * team where it is mathematically unjustified.
+ * Builds a fully-populated AuditResult.
+ * Populates both the new (spec) field names and the legacy aliases.
  */
-function isOverkillPlan(tool: ToolState, teamSize: number): boolean {
-  const isEnterpriseTier =
-    tool.planName === "Enterprise" ||
-    (tool.toolName === "GitHub Copilot" && tool.planName === "Enterprise");
-  return isEnterpriseTier && teamSize < ENTERPRISE_JUSTIFIED_SEAT_THRESHOLD;
-}
-
-/**
- * For coding teams, suggests switching from a chat-only tool to a
- * purpose-built coding assistant if the per-seat cost is lower.
- */
-function suggestCodingSwitch(
-  tool: ToolState,
-  useCase: UseCase
-): { switchTo: ToolName; monthlyPrice: number } | null {
-  if (useCase !== "coding" && useCase !== "mixed") return null;
-  if (CODING_PREFERRED_TOOLS.includes(tool.toolName)) return null; // already optimal
-
-  // Suggest Windsurf Pro as the cheapest well-known coding alternative
-  const windsurfProPrice = PRICE["Windsurf"]["Pro"] ?? 15;
-  const currentPerSeat = tool.monthlySpend / Math.max(tool.seats, 1);
-  if (windsurfProPrice < currentPerSeat) {
-    return { switchTo: "Windsurf", monthlyPrice: windsurfProPrice };
-  }
-
-  return null;
-}
-
-// ─── Core Evaluation ──────────────────────────────────────────────────────────
-
-function evaluateTool(tool: ToolState, form: FormState): AuditResult {
-  const { teamSize, useCase } = form.team;
-  const seats = Math.max(tool.seats, 0);
-  const currentTotal = tool.monthlySpend;
-
-  // Guard: zero seats — nothing to optimize
-  if (seats === 0) {
-    return buildResult(tool, "OPTIMAL", "No seats are allocated; nothing to optimize.", null, null, 0);
-  }
-
-  // Guard: zero spend — might be free tier
-  if (currentTotal === 0) {
-    return buildResult(tool, "OPTIMAL", "You are on a free plan — no spend to reduce.", null, null, 0);
-  }
-
-  // Collect every valid recommendation, then pick the one with highest savings.
-  const candidates: AuditResult[] = [];
-
-  // 1. Overkill Enterprise plan — same-vendor downgrade
-  if (isOverkillPlan(tool, teamSize)) {
-    const better = cheaperPlan(tool.toolName, tool.planName, seats, currentTotal);
-    if (better) {
-      const savings = currentTotal - better.total;
-      if (savings > 0) {
-        candidates.push(buildResult(
-          tool,
-          "DOWNGRADE_PLAN",
-          `Enterprise tier is oversized for a team of ${teamSize}; downgrading to ${better.plan} saves $${savings.toFixed(0)}/mo.`,
-          better.plan,
-          null,
-          savings
-        ));
-      }
-    }
-  }
-
-  // 2. Cheaper same-vendor plan (non-Enterprise context)
-  const cheaper = cheaperPlan(tool.toolName, tool.planName, seats, currentTotal);
-  if (cheaper) {
-    const savings = currentTotal - cheaper.total;
-    if (savings > 0) {
-      candidates.push(buildResult(
-        tool,
-        "DOWNGRADE_PLAN",
-        `Switching from ${tool.planName} to ${cheaper.plan} on ${tool.toolName} reduces your bill by $${savings.toFixed(0)}/mo.`,
-        cheaper.plan,
-        null,
-        savings
-      ));
-    }
-  }
-
-  // 3. Cross-tool switch for coding teams
-  const switchSuggestion = suggestCodingSwitch(tool, useCase);
-  if (switchSuggestion) {
-    const recommendedTotal = switchSuggestion.monthlyPrice * seats;
-    const savings = currentTotal - recommendedTotal;
-    if (savings > 0) {
-      candidates.push(buildResult(
-        tool,
-        "SWITCH_TOOL",
-        `For a coding-focused team, ${switchSuggestion.switchTo} Pro ($${switchSuggestion.monthlyPrice}/seat) is $${savings.toFixed(0)}/mo cheaper than your current ${tool.toolName} spend.`,
-        null,
-        switchSuggestion.switchTo,
-        savings
-      ));
-    }
-  }
-
-  // 4. Writing/research teams on expensive coding tools
-  if (
-    (useCase === "writing" || useCase === "research") &&
-    CODING_PREFERRED_TOOLS.includes(tool.toolName)
-  ) {
-    const geminiAdvancedPrice = PRICE["Gemini"]["Advanced"] ?? 20;
-    const currentPerSeat = currentTotal / seats;
-    if (geminiAdvancedPrice < currentPerSeat) {
-      const recommendedTotal = geminiAdvancedPrice * seats;
-      const savings = currentTotal - recommendedTotal;
-      candidates.push(buildResult(
-        tool,
-        "SWITCH_TOOL",
-        `For ${useCase} workflows, Gemini Advanced ($${geminiAdvancedPrice}/seat) is better suited and $${savings.toFixed(0)}/mo cheaper than a coding IDE subscription.`,
-        null,
-        "Gemini",
-        savings
-      ));
-    }
-  }
-
-  // Return highest-savings recommendation, or OPTIMAL if none found
-  if (candidates.length === 0) {
-    return buildResult(
-      tool,
-      "OPTIMAL",
-      `Your ${tool.toolName} ${tool.planName} plan is appropriately sized for your team.`,
-      null,
-      null,
-      0
-    );
-  }
-
-  return candidates.reduce((best, c) => (c.monthlySavings > best.monthlySavings ? c : best));
-}
-
 function buildResult(
   tool: ToolState,
   action: ActionType,
-  reason: string,
+  reasoning: string,
   recommendedPlan: PlanName | null,
   recommendedTool: ToolName | null,
   monthlySavings: number
 ): AuditResult {
-  const annualSavings = monthlySavings * 12;
+  const annualSavings = +(monthlySavings * 12).toFixed(2);
+  const ms = +monthlySavings.toFixed(2);
   return {
-    toolId: tool.id,
-    toolName: tool.toolName,
-    currentMonthlySpend: tool.monthlySpend,
-    recommendedAction: action,
-    reason,
+    toolId:              tool.id,
+    toolName:            resolveName(tool),
+    currentSpend:        tool.monthlySpend,
+    currentMonthlySpend: tool.monthlySpend, // legacy alias
+    recommendedAction:   action,
+    reasoning,
+    reason:              reasoning,          // legacy alias
     recommendedPlan,
     recommendedTool,
-    monthlySavings,
+    monthlySavings:      ms,
     annualSavings,
   };
+}
+
+function optimal(tool: ToolState, reasoning: string): AuditResult {
+  return buildResult(tool, "OPTIMAL", reasoning, null, null, 0);
+}
+
+// ─── Rule Implementations ────────────────────────────────────────────────────
+
+/**
+ * Rule 1 — The Solo Overkill.
+ * Solo user on a Team-priced plan (ChatGPT Team $30 or Claude Team $30)
+ * should downgrade to the individual tier.
+ */
+function ruleSoloOverkill(tool: ToolState): AuditResult | null {
+  const name = resolveName(tool);
+  const plan = resolvePlan(tool);
+  if (tool.seats !== 1) return null;
+
+  const teamTierTools: Record<string, { teamPlan: string; cheaperPlan: PlanName; cheaperPrice: number }> = {
+    "ChatGPT": { teamPlan: "Team", cheaperPlan: "Plus", cheaperPrice: 20 },
+    "Claude":  { teamPlan: "Team", cheaperPlan: "Pro",  cheaperPrice: 20 },
+  };
+
+  const match = teamTierTools[name];
+  if (!match || plan !== match.teamPlan) return null;
+
+  const teamPrice = perSeatPrice(name, plan);
+  if (teamPrice === null) return null;
+
+  const savings = teamPrice - match.cheaperPrice; // 30 − 20 = 10
+  if (savings <= 0) return null;
+
+  return buildResult(
+    tool,
+    "DOWNGRADE_PLAN",
+    `You have 1 seat on ${name} ${plan} ($${teamPrice}/mo), which requires a minimum team. Downgrading to ${match.cheaperPlan} ($${match.cheaperPrice}/mo) saves $${savings}/mo — same frontier model access for a solo user.`,
+    match.cheaperPlan,
+    null,
+    savings
+  );
+}
+
+/**
+ * Rule 2 — Enterprise Downgrade.
+ * If the team has < 50 people and their cost-per-seat exceeds the standard
+ * Business/Team tier, recommend moving to centralized billing.
+ */
+function ruleEnterpriseDowngrade(tool: ToolState, team: TeamData): AuditResult | null {
+  const name = resolveName(tool);
+  const plan = resolvePlan(tool);
+
+  if (plan !== "Enterprise") return null;
+  if (team.teamSize >= ENTERPRISE_SEAT_THRESHOLD) return null;
+
+  const costPerSeat = tool.monthlySpend / Math.max(tool.seats, 1);
+
+  // Determine the best non-Enterprise tier for this tool
+  const tiers = TOOL_PRICING[name];
+  if (!tiers) return null;
+
+  let bestPlan: string | null = null;
+  let bestPrice: number | null = null;
+
+  for (const [tierName, tierPrice] of Object.entries(tiers)) {
+    if (tierName === "Enterprise" || tierPrice === null || tierPrice === 0) continue;
+    if (bestPrice === null || tierPrice < bestPrice) {
+      bestPrice = tierPrice;
+      bestPlan = tierName;
+    }
+  }
+
+  if (bestPlan === null || bestPrice === null) return null;
+  if (costPerSeat <= bestPrice) return null; // already paying less
+
+  const savings = (costPerSeat - bestPrice) * tool.seats;
+  if (savings <= 0) return null;
+
+  return buildResult(
+    tool,
+    "DOWNGRADE_PLAN",
+    `Your ${name} Enterprise contract costs $${costPerSeat.toFixed(2)}/seat/mo. A team of ${team.teamSize} qualifies for centralized ${bestPlan} billing at $${bestPrice}/seat/mo — saving $${savings.toFixed(0)}/mo.`,
+    bestPlan as PlanName,
+    null,
+    savings
+  );
+}
+
+/**
+ * Rule 3 — Copilot + Premium LLM Redundancy.
+ * Coding teams paying for both GitHub Copilot AND a paid ChatGPT/Claude
+ * subscription can consolidate into a single tool (Cursor Business or
+ * Windsurf Teams, $40/user) that bundles IDE completion + frontier chat.
+ *
+ * This rule is applied at the report level (needs the full tool list) and
+ * emits a result for the *more expensive* of the two overlapping tools.
+ */
+function ruleCopilotRedundancy(
+  tools: ToolState[],
+  team: TeamData
+): AuditResult | null {
+  if (resolveUseCase(team) !== "coding") return null;
+
+  const copilot = tools.find((t) => {
+    const n = resolveName(t);
+    const p = resolvePlan(t);
+    return n === "GitHub Copilot" && p !== "Free";
+  });
+  if (!copilot) return null;
+
+  const premiumLLM = tools.find((t) => {
+    const n = resolveName(t);
+    const p = resolvePlan(t);
+    return (
+      (n === "ChatGPT" && (p === "Plus" || p === "Pro" || p === "Team" || p === "Enterprise")) ||
+      (n === "Claude"  && (p === "Pro"  || p === "Team" || p === "Enterprise"))
+    );
+  });
+  if (!premiumLLM) return null;
+
+  // The tool flagged is whichever costs more
+  const primaryTool = copilot.monthlySpend >= premiumLLM.monthlySpend ? copilot : premiumLLM;
+  const secondarySpend = primaryTool === copilot ? premiumLLM.monthlySpend : copilot.monthlySpend;
+  const seats = Math.max(primaryTool.seats, 1);
+
+  // Recommend consolidating to Cursor Business ($40/user)
+  const consolidatedPrice = 40; // Cursor Business
+  const consolidatedTotal = consolidatedPrice * seats;
+  const combinedCurrentSpend = copilot.monthlySpend + premiumLLM.monthlySpend;
+  const savings = combinedCurrentSpend - consolidatedTotal;
+  if (savings <= 0) return null;
+
+  return buildResult(
+    primaryTool,
+    "REMOVE_REDUNDANCY",
+    `Your coding team is paying for both GitHub Copilot and ${resolveName(premiumLLM)} — overlapping tools for a combined $${combinedCurrentSpend}/mo. Consolidating to Cursor Business ($${consolidatedPrice}/seat) covers IDE completion + frontier models for $${consolidatedTotal}/mo, saving $${savings.toFixed(0)}/mo.`,
+    "Business" as PlanName,
+    "Cursor",
+    savings
+  );
+}
+
+/**
+ * Rule 4 — API Efficiency.
+ * Teams spending > $100/mo on OpenAI API or Anthropic API for data/research
+ * workflows can cut token costs ~50% by switching to Haiku or Gemini Flash.
+ */
+function ruleApiEfficiency(tool: ToolState, team: TeamData): AuditResult | null {
+  const name = resolveName(tool);
+  if (name !== "OpenAI API" && name !== "Anthropic API") return null;
+
+  const uc = resolveUseCase(team);
+  if (uc !== "data" && uc !== "research") return null;
+
+  if (tool.monthlySpend <= API_EFFICIENCY_THRESHOLD) return null;
+
+  const savings = tool.monthlySpend * API_EFFICIENCY_SAVINGS_RATE;
+  const cheapModel = name === "OpenAI API" ? "GPT-4o-mini" : "Claude 3 Haiku";
+  const altModel   = "Gemini 1.5 Flash";
+
+  return buildResult(
+    tool,
+    "API_EFFICIENCY",
+    `Your ${name} spend of $${tool.monthlySpend}/mo is dominated by bulk ${uc} processing. Routing non-critical requests through ${cheapModel} or ${altModel} (up to 95% cheaper per token) can conservatively cut costs by 50% — an estimated $${savings.toFixed(0)}/mo saving.`,
+    null,
+    null,
+    savings
+  );
+}
+
+// ─── Per-Tool Fallback Evaluation ────────────────────────────────────────────
+// Runs after global rules so it only fires on tools not already flagged.
+
+function evaluateTool(tool: ToolState, team: TeamData): AuditResult {
+  const seats = tool.seats;
+  const spend  = tool.monthlySpend;
+
+  if (seats === 0)  return optimal(tool, "No seats allocated — nothing to optimise.");
+  if (spend  === 0) return optimal(tool, "You are on a free plan — no spend to reduce.");
+
+  // Per-tool same-vendor cheaper plan scan
+  const name = resolveName(tool);
+  const plan = resolvePlan(tool);
+  const tiers = TOOL_PRICING[name];
+  if (!tiers) return optimal(tool, `Your ${name} ${plan} plan is appropriately sized. Keep current plan.`);
+
+  const currentPerSeat = spend / seats;
+  let bestPlan: string | null = null;
+  let bestPrice: number | null = null;
+
+  for (const [tierName, tierPrice] of Object.entries(tiers)) {
+    if (tierName === plan || tierPrice === null || tierPrice === 0) continue;
+    if (tierPrice < currentPerSeat && (bestPrice === null || tierPrice < bestPrice)) {
+      bestPrice = tierPrice;
+      bestPlan  = tierName;
+    }
+  }
+
+  if (bestPlan !== null && bestPrice !== null) {
+    const savings = (currentPerSeat - bestPrice) * seats;
+    if (savings > 0) {
+      return buildResult(
+        tool,
+        "DOWNGRADE_PLAN",
+        `Switching from ${name} ${plan} ($${currentPerSeat}/seat) to ${bestPlan} ($${bestPrice}/seat) saves $${savings.toFixed(0)}/mo.`,
+        bestPlan as PlanName,
+        null,
+        savings
+      );
+    }
+  }
+
+  return optimal(tool, `Optimized. Keep current plan.`);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Runs the full audit on the user's submitted form state.
- * Returns an AuditReport with per-tool results and totals.
+ * Runs the full audit for a team against their tool stack.
+ *
+ * Accepts either the explicit `(team, tools)` signature (per spec) or the
+ * legacy `(FormState)` signature used by existing tests and the form component.
+ *
+ * Returns an AuditReport with per-tool results and aggregate totals.
  */
-export function runAudit(form: FormState): AuditReport {
-  const results = form.tools.map((tool) => evaluateTool(tool, form));
+export function runAudit(teamOrForm: TeamData | FormState, toolsArg?: ToolState[]): AuditReport {
+  let team: TeamData;
+  let tools: ToolState[];
 
-  const totalMonthlySavings = results.reduce(
-    (sum, r) => sum + r.monthlySavings,
-    0
-  );
-  const totalAnnualSavings = totalMonthlySavings * 12;
+  if (toolsArg !== undefined) {
+    // Spec signature: runAudit(team, tools)
+    team  = teamOrForm as TeamData;
+    tools = toolsArg;
+  } else {
+    // Legacy signature: runAudit(formState)
+    const form = teamOrForm as FormState;
+    team  = form.team;
+    tools = form.tools;
+  }
+
+  if (tools.length === 0) {
+    return { results: [], totalMonthlySavings: 0, totalAnnualSavings: 0 };
+  }
+
+  // Track which tool IDs have been handled by a global rule
+  const handled = new Set<string>();
+  const results: AuditResult[] = [];
+
+  // ── Global Rule 3: Copilot + Premium LLM redundancy (cross-tool) ──────────
+  const redundancyResult = ruleCopilotRedundancy(tools, team);
+  if (redundancyResult) {
+    results.push(redundancyResult);
+    handled.add(redundancyResult.toolId);
+  }
+
+  // ── Per-tool rules ────────────────────────────────────────────────────────
+  for (const tool of tools) {
+    if (handled.has(tool.id)) continue;
+
+    // Collect candidates from all applicable rules; pick highest savings.
+    const candidates: AuditResult[] = [];
+
+    const r1 = ruleSoloOverkill(tool);
+    if (r1) candidates.push(r1);
+
+    const r2 = ruleEnterpriseDowngrade(tool, team);
+    if (r2) candidates.push(r2);
+
+    const r4 = ruleApiEfficiency(tool, team);
+    if (r4) candidates.push(r4);
+
+    // Fallback: generic same-vendor scan
+    const fallback = evaluateTool(tool, team);
+    candidates.push(fallback);
+
+    // Winner = highest savings (OPTIMAL has 0, so it only wins when no rule fires)
+    const winner = candidates.reduce((best, c) =>
+      c.monthlySavings > best.monthlySavings ? c : best
+    );
+    results.push(winner);
+  }
+
+  const totalMonthlySavings = +results.reduce((s, r) => s + r.monthlySavings, 0).toFixed(2);
+  const totalAnnualSavings  = +(totalMonthlySavings * 12).toFixed(2);
 
   return { results, totalMonthlySavings, totalAnnualSavings };
 }

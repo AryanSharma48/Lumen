@@ -19,19 +19,14 @@ export type UseCase =
 
 // ─── Plan Definitions ─────────────────────────────────────────────────────────
 
-/**
- * Each tool has a fixed set of plans. Using a discriminated union approach
- * keeps plan names and their pricing strictly associated with the right tool.
- */
-
-export type CursorPlan = "Hobby" | "Pro" | "Business" | "Enterprise";
-export type CopilotPlan = "Individual" | "Business" | "Enterprise";
-export type ClaudePlan = "Free" | "Pro" | "Team" | "Enterprise";
-export type ChatGPTPlan = "Free" | "Plus" | "Team" | "Enterprise";
+export type CursorPlan    = "Hobby" | "Pro" | "Pro+" | "Business" | "Enterprise";
+export type CopilotPlan   = "Free" | "Individual" | "Pro+" | "Business" | "Enterprise";
+export type ClaudePlan    = "Free" | "Pro" | "Team" | "Enterprise";
+export type ChatGPTPlan   = "Free" | "Plus" | "Pro" | "Team" | "Enterprise";
 export type AnthropicApiPlan = "Pay-as-you-go";
-export type OpenAiApiPlan = "Pay-as-you-go";
-export type GeminiPlan = "Free" | "Advanced" | "Business" | "Enterprise";
-export type WindsurfPlan = "Free" | "Pro" | "Teams" | "Enterprise";
+export type OpenAiApiPlan    = "Pay-as-you-go";
+export type GeminiPlan    = "Free" | "Advanced" | "Business" | "Enterprise";
+export type WindsurfPlan  = "Free" | "Pro" | "Teams" | "Enterprise";
 
 export type PlanName =
   | CursorPlan
@@ -49,16 +44,34 @@ export type PlanName =
 export interface TeamData {
   /** Total headcount across the team. */
   teamSize: number;
-  /** Primary workflow the team uses AI for. */
-  useCase: UseCase;
+  /**
+   * Primary workflow the team uses AI for.
+   * Aliased as `primaryUseCase` per spec; internally we also expose `useCase`
+   * for backwards-compat with existing form/test code.
+   */
+  primaryUseCase: UseCase;
+  /** @deprecated Use `primaryUseCase`. Kept for backwards-compat with existing tests. */
+  useCase?: UseCase;
 }
 
 /** State for a single AI tool row in the spend form. */
 export interface ToolState {
   /** Stable ID for React list key. */
   id: string;
-  toolName: ToolName;
-  planName: PlanName;
+  /**
+   * Display name of the tool.
+   * Aliased as `name` per spec; `toolName` preserved for backwards-compat.
+   */
+  name: ToolName;
+  /** @deprecated Use `name`. Kept for backwards-compat with existing tests. */
+  toolName?: ToolName;
+  /**
+   * Active billing plan.
+   * Aliased as `plan` per spec; `planName` preserved for backwards-compat.
+   */
+  plan: PlanName;
+  /** @deprecated Use `plan`. Kept for backwards-compat with existing tests. */
+  planName?: PlanName;
   /** Actual monthly dollars currently being paid (can include negotiated rates). */
   monthlySpend: number;
   /** Number of paid seats / licenses for this tool. */
@@ -78,17 +91,24 @@ export type ActionType =
   | "UPGRADE_PLAN"         // User would save money by consolidating seats on a higher tier
   | "SWITCH_TOOL"          // A competing tool is materially cheaper for their use case
   | "REMOVE_REDUNDANCY"    // Two tools overlap heavily; one can be dropped
+  | "API_EFFICIENCY"       // Cheaper API model available for bulk processing
   | "OPTIMAL";             // Current setup is already the best option
 
 /** One recommendation per evaluated tool entry. */
 export interface AuditResult {
   /** Which ToolState this result corresponds to. */
   toolId: string;
+  /** Display name — mirrors ToolState.name for convenience. */
   toolName: ToolName;
-  currentMonthlySpend: number;
+  currentSpend: number;
+  /** @deprecated Use `currentSpend`. Kept for backwards-compat with existing tests. */
+  currentMonthlySpend?: number;
+  /** Short action token (e.g. "DOWNGRADE_PLAN"). */
   recommendedAction: ActionType;
   /** Human-readable, one-sentence reason shown in the UI. */
-  reason: string;
+  reasoning: string;
+  /** @deprecated Use `reasoning`. Kept for backwards-compat with existing tests. */
+  reason?: string;
   /** The recommended plan name (null when OPTIMAL or SWITCH_TOOL). */
   recommendedPlan: PlanName | null;
   /** The alternative tool to switch to (null unless SWITCH_TOOL). */
