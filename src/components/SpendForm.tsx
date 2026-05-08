@@ -17,17 +17,23 @@ const TOOL_NAMES: ToolName[] = [
 ]
 
 const PLANS_BY_TOOL: Record<ToolName, PlanName[]> = {
-  Cursor: ['Hobby', 'Pro', 'Business', 'Enterprise'],
-  'GitHub Copilot': ['Individual', 'Business', 'Enterprise'],
-  Claude: ['Free', 'Pro', 'Team', 'Enterprise'],
-  ChatGPT: ['Free', 'Plus', 'Team', 'Enterprise'],
-  'Anthropic API': ['Pay-as-you-go'],
-  'OpenAI API': ['Pay-as-you-go'],
-  Gemini: ['Free', 'Advanced', 'Business', 'Enterprise'],
-  Windsurf: ['Free', 'Pro', 'Teams', 'Enterprise'],
+  'Cursor':         ['Hobby', 'Pro', 'Pro+', 'Business', 'Enterprise'],
+  'GitHub Copilot': ['Free', 'Individual', 'Pro+', 'Business', 'Enterprise'],
+  'Claude':         ['Free', 'Pro', 'Team', 'Enterprise'],
+  'ChatGPT':        ['Free', 'Plus', 'Pro', 'Team', 'Enterprise'],
+  'Anthropic API':  ['Pay-as-you-go'],
+  'OpenAI API':     ['Pay-as-you-go'],
+  'Gemini':         ['Free', 'Advanced'],
+  'Windsurf':       ['Free', 'Pro', 'Teams', 'Enterprise'],
 }
 
-const USE_CASES: UseCase[] = ['coding', 'writing', 'data', 'research', 'mixed']
+const USE_CASES: { value: UseCase; label: string }[] = [
+  { value: 'coding',   label: 'Coding' },
+  { value: 'writing',  label: 'Writing' },
+  { value: 'data',     label: 'Data' },
+  { value: 'research', label: 'Research' },
+  { value: 'mixed',    label: 'Mixed' },
+]
 
 const LS_KEY = 'lumen_form_state'
 
@@ -43,7 +49,6 @@ function makeToolRow(overrides: Partial<ToolState> = {}): ToolState {
   const planName: PlanName = overrides.planName ?? overrides.plan ?? PLANS_BY_TOOL[toolName][0]
   return {
     id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    // Populate both legacy and spec field names so the engine always has what it needs
     toolName,
     name: toolName,
     planName,
@@ -85,7 +90,6 @@ function reducer(state: FormState, action: Action): FormState {
       const tools = state.tools.map((t) => {
         if (t.id !== action.id) return t
         const updated = { ...t, [action.field]: action.value }
-        // When the tool name changes, reset plan to the first valid option
         if (action.field === 'toolName') {
           const newTool = action.value as ToolName
           updated.toolName = newTool
@@ -93,7 +97,6 @@ function reducer(state: FormState, action: Action): FormState {
           updated.planName = PLANS_BY_TOOL[newTool][0]
           updated.plan = updated.planName
         }
-        // Keep spec aliases in sync when plan changes
         if (action.field === 'planName') {
           updated.plan = action.value as PlanName
         }
@@ -107,10 +110,19 @@ function reducer(state: FormState, action: Action): FormState {
   }
 }
 
+// ─── Shared input style tokens ────────────────────────────────────────────────
+
+const inputCls =
+  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition'
+
+const selectCls =
+  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition'
+
+const labelCls = 'block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-1'
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface SpendFormProps {
-  /** Called when the user submits the form with the current state. */
   onSubmit: (state: FormState) => void
 }
 
@@ -119,7 +131,6 @@ interface SpendFormProps {
 export default function SpendForm({ onSubmit }: SpendFormProps) {
   const [state, dispatch] = useReducer(reducer, DEFAULT_FORM)
 
-  // ── Hydrate from localStorage on mount ─────────────────────────────────────
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_KEY)
@@ -128,20 +139,18 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
         dispatch({ type: 'LOAD_STATE', payload: parsed })
       }
     } catch {
-      // Corrupted storage — silently ignore; user starts fresh
+      // Corrupted storage — silently ignore
     }
   }, [])
 
-  // ── Persist to localStorage on every state change ──────────────────────────
   useEffect(() => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(state))
     } catch {
-      // Storage quota exceeded or private mode — silently ignore
+      // Storage quota exceeded — silently ignore
     }
   }, [state])
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleToolChange = useCallback(
     (id: string, field: keyof ToolState, raw: string) => {
       const numericFields: (keyof ToolState)[] = ['monthlySpend', 'seats']
@@ -156,15 +165,17 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
     onSubmit(state)
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const canSubmit = state.tools.length > 0
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 p-6 max-w-3xl mx-auto">
-      {/* ── Team Section ── */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Your Team</h2>
-        <div className="flex gap-4 flex-wrap">
-          <label className="flex flex-col gap-1 text-sm">
-            Total team size
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+
+      {/* ── Team Section ─────────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-zinc-900">Your Team</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="team-size" className={labelCls}>Team size</label>
             <input
               id="team-size"
               type="number"
@@ -173,83 +184,83 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
               onChange={(e) =>
                 dispatch({ type: 'SET_TEAM_SIZE', payload: parseInt(e.target.value) || 1 })
               }
-              className="border rounded px-2 py-1 w-28"
+              className={inputCls}
             />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            Primary use case
+          </div>
+          <div>
+            <label htmlFor="use-case" className={labelCls}>Primary use case</label>
             <select
               id="use-case"
-              value={state.team.useCase}
+              value={state.team.primaryUseCase ?? state.team.useCase}
               onChange={(e) =>
                 dispatch({ type: 'SET_USE_CASE', payload: e.target.value as UseCase })
               }
-              className="border rounded px-2 py-1"
+              className={selectCls}
             >
               {USE_CASES.map((uc) => (
-                <option key={uc} value={uc}>
-                  {uc.charAt(0).toUpperCase() + uc.slice(1)}
-                </option>
+                <option key={uc.value} value={uc.value}>{uc.label}</option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
       </section>
 
-      {/* ── Tools Section ── */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3">AI Tool Subscriptions</h2>
+      {/* ── Tools Section ─────────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-1 text-base font-semibold text-zinc-900">AI Tool Subscriptions</h2>
+        <p className="mb-4 text-sm text-zinc-500">
+          Add every AI tool your team pays for, even partially.
+        </p>
 
         {state.tools.length === 0 && (
-          <p className="text-sm text-gray-500 mb-2">
-            No tools added yet. Click &ldquo;Add Tool&rdquo; to begin.
-          </p>
+          <div className="mb-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center">
+            <p className="text-sm text-zinc-400">No tools added yet — click below to start.</p>
+          </div>
         )}
 
         <div className="space-y-3">
           {state.tools.map((tool, idx) => (
             <div
               key={tool.id}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end border rounded p-3"
+              className="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-4"
             >
               {/* Tool Name */}
-              <label className="flex flex-col gap-1 text-xs">
-                Tool {idx + 1}
+              <div>
+                <label htmlFor={`tool-name-${tool.id}`} className={labelCls}>
+                  Tool {idx + 1}
+                </label>
                 <select
                   id={`tool-name-${tool.id}`}
                   value={tool.name ?? tool.toolName!}
                   onChange={(e) => handleToolChange(tool.id, 'toolName', e.target.value)}
-                  className="border rounded px-1 py-1"
+                  className={selectCls}
                 >
                   {TOOL_NAMES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
+                    <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               {/* Plan */}
-              <label className="flex flex-col gap-1 text-xs">
-                Plan
+              <div>
+                <label htmlFor={`tool-plan-${tool.id}`} className={labelCls}>Plan</label>
                 <select
                   id={`tool-plan-${tool.id}`}
                   value={tool.plan ?? tool.planName!}
                   onChange={(e) => handleToolChange(tool.id, 'planName', e.target.value)}
-                  className="border rounded px-1 py-1"
+                  className={selectCls}
                 >
                   {PLANS_BY_TOOL[tool.name ?? tool.toolName!].map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
+                    <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               {/* Monthly Spend */}
-              <label className="flex flex-col gap-1 text-xs">
-                Monthly spend ($)
+              <div>
+                <label htmlFor={`tool-spend-${tool.id}`} className={labelCls}>
+                  Monthly spend ($)
+                </label>
                 <input
                   id={`tool-spend-${tool.id}`}
                   type="number"
@@ -257,27 +268,25 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
                   step={0.01}
                   value={tool.monthlySpend}
                   onChange={(e) => handleToolChange(tool.id, 'monthlySpend', e.target.value)}
-                  className="border rounded px-1 py-1"
+                  className={inputCls}
                 />
-              </label>
+              </div>
 
               {/* Seats + Remove */}
-              <div className="flex flex-col gap-1">
-                <label className="flex flex-col gap-1 text-xs">
-                  Seats
-                  <input
-                    id={`tool-seats-${tool.id}`}
-                    type="number"
-                    min={0}
-                    value={tool.seats}
-                    onChange={(e) => handleToolChange(tool.id, 'seats', e.target.value)}
-                    className="border rounded px-1 py-1"
-                  />
-                </label>
+              <div>
+                <label htmlFor={`tool-seats-${tool.id}`} className={labelCls}>Seats</label>
+                <input
+                  id={`tool-seats-${tool.id}`}
+                  type="number"
+                  min={0}
+                  value={tool.seats}
+                  onChange={(e) => handleToolChange(tool.id, 'seats', e.target.value)}
+                  className={inputCls}
+                />
                 <button
                   type="button"
                   onClick={() => dispatch({ type: 'REMOVE_TOOL', id: tool.id })}
-                  className="text-xs text-red-500 hover:underline self-start"
+                  className="mt-1.5 text-xs font-medium text-rose-500 hover:text-rose-700 transition-colors"
                 >
                   Remove
                 </button>
@@ -290,20 +299,20 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
           type="button"
           id="add-tool-btn"
           onClick={() => dispatch({ type: 'ADD_TOOL' })}
-          className="mt-3 text-sm border rounded px-3 py-1 hover:bg-gray-50"
+          className="mt-4 flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
         >
-          + Add Tool
+          <span className="text-base leading-none">+</span> Add Tool
         </button>
       </section>
 
-      {/* ── Submit ── */}
+      {/* ── Submit ────────────────────────────────────────────────────────── */}
       <button
         type="submit"
         id="run-audit-btn"
-        disabled={state.tools.length === 0}
-        className="w-full bg-indigo-600 text-white rounded py-2 font-medium disabled:opacity-50"
+        disabled={!canSubmit}
+        className="w-full rounded-xl bg-zinc-900 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Run Audit
+        {canSubmit ? 'Run Audit →' : 'Add at least one tool to run the audit'}
       </button>
     </form>
   )

@@ -11,3 +11,10 @@
 **What I learned:** Evolving a data model without breaking the UI is tricky. I learned to use `@deprecated` aliases in my TypeScript interfaces for the older properties (like `useCase` and `planName`). This allowed the new engine to support both, ensuring the existing `SpendForm` component didn't instantly break while I upgraded the backend.
 **Blockers / what I'm stuck on:** Figuring out how to handle custom "Contact Sales" Enterprise pricing mathematically. I realized estimating it is indefensible, so I structured the logic to rely entirely on the user's inputted monthly spend as the ground truth for those tiers.
 **Plan for tomorrow:** Build the Audit Results UI to display the engine's outputs, surface the Credex consultation pitch for high-savings users, and integrate the LLM API for the personalized summary.
+
+## Day 3 2026-05-09
+**Hours worked:** 3
+**What I did:** Built `AuditResults.tsx` — the full results UI with a hero savings section, conditional CTA banners (Credex pitch >$500, optimized banner <$100, standard report capture in between), an AI summary skeleton placeholder, and per-tool recommendation cards sorted by savings. Wired the full `SpendForm → runAudit → AuditResults` flow into `page.tsx`. Redesigned `SpendForm` with explicit Tailwind color classes to fix washed-out rendering. Fixed a CI type error caused by `SpendForm` not satisfying the updated `TeamData`/`ToolState` interfaces after the engine rewrite.
+**What I learned:** Next.js App Router SSRs client components too — hydration mismatches appear when a stale Turbopack cache serves old HTML while the client runs new JS. Clearing `.next` and hard-refreshing fixes it. Tailwind v4's CSS-first setup doesn't cascade body color reliably to all elements; explicit color classes on every text node are non-negotiable.
+**Blockers / what I'm stuck on:** The AI summary card is a permanent skeleton — no LLM is wired to it yet.
+**Plan for tomorrow:** Connect the AI summary to a real LLM (Gemini or OpenAI) with streaming, integrate Supabase for lead capture on the email forms, and polish the mobile layout.
