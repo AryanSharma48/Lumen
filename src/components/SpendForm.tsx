@@ -34,16 +34,20 @@ const LS_KEY = 'lumen_form_state'
 // ─── Default State ─────────────────────────────────────────────────────────
 
 const DEFAULT_FORM: FormState = {
-  team: { teamSize: 1, useCase: 'coding' },
+  team: { teamSize: 1, useCase: 'coding', primaryUseCase: 'coding' },
   tools: [],
 }
 
 function makeToolRow(overrides: Partial<ToolState> = {}): ToolState {
-  const toolName: ToolName = overrides.toolName ?? 'Cursor'
+  const toolName: ToolName = overrides.toolName ?? overrides.name ?? 'Cursor'
+  const planName: PlanName = overrides.planName ?? overrides.plan ?? PLANS_BY_TOOL[toolName][0]
   return {
     id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    // Populate both legacy and spec field names so the engine always has what it needs
     toolName,
-    planName: PLANS_BY_TOOL[toolName][0],
+    name: toolName,
+    planName,
+    plan: planName,
     monthlySpend: 0,
     seats: 1,
     ...overrides,
@@ -69,7 +73,7 @@ function reducer(state: FormState, action: Action): FormState {
       return { ...state, team: { ...state.team, teamSize: action.payload } }
 
     case 'SET_USE_CASE':
-      return { ...state, team: { ...state.team, useCase: action.payload } }
+      return { ...state, team: { ...state.team, useCase: action.payload, primaryUseCase: action.payload } }
 
     case 'ADD_TOOL':
       return { ...state, tools: [...state.tools, makeToolRow()] }
@@ -84,7 +88,14 @@ function reducer(state: FormState, action: Action): FormState {
         // When the tool name changes, reset plan to the first valid option
         if (action.field === 'toolName') {
           const newTool = action.value as ToolName
+          updated.toolName = newTool
+          updated.name = newTool
           updated.planName = PLANS_BY_TOOL[newTool][0]
+          updated.plan = updated.planName
+        }
+        // Keep spec aliases in sync when plan changes
+        if (action.field === 'planName') {
+          updated.plan = action.value as PlanName
         }
         return updated
       })
@@ -207,7 +218,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
                 Tool {idx + 1}
                 <select
                   id={`tool-name-${tool.id}`}
-                  value={tool.toolName}
+                  value={tool.name ?? tool.toolName!}
                   onChange={(e) => handleToolChange(tool.id, 'toolName', e.target.value)}
                   className="border rounded px-1 py-1"
                 >
@@ -224,11 +235,11 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
                 Plan
                 <select
                   id={`tool-plan-${tool.id}`}
-                  value={tool.planName}
+                  value={tool.plan ?? tool.planName!}
                   onChange={(e) => handleToolChange(tool.id, 'planName', e.target.value)}
                   className="border rounded px-1 py-1"
                 >
-                  {PLANS_BY_TOOL[tool.toolName].map((p) => (
+                  {PLANS_BY_TOOL[tool.name ?? tool.toolName!].map((p) => (
                     <option key={p} value={p}>
                       {p}
                     </option>
