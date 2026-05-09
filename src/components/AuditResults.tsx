@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AuditResult, ActionType } from '@/types/audit'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -99,6 +99,53 @@ function AISummaryPlaceholder() {
         <div className="h-4 w-4/6 animate-pulse rounded bg-zinc-100" />
       </div>
       <p className="mt-3 text-xs text-zinc-400">Generating your personalized savings analysis…</p>
+    </section>
+  )
+}
+
+function AISummary({ results, totalMonthlySavings }: { results: AuditResult[], totalMonthlySavings: number }) {
+  const [summary, setSummary] = useState<string | null>(null)
+  const [error, setError] = useState<boolean>(false)
+
+  useEffect(() => {
+    let ignore = false
+    async function fetchSummary() {
+      try {
+        const res = await fetch('/api/summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results, totalMonthlySavings })
+        })
+        if (!res.ok) throw new Error('Failed to fetch summary')
+        const data = await res.json()
+        if (!ignore) setSummary(data.summary)
+      } catch (err) {
+        if (!ignore) setError(true)
+      }
+    }
+    fetchSummary()
+    return () => { ignore = true }
+  }, [results, totalMonthlySavings])
+
+  if (error) {
+    return (
+      <section aria-label="AI Personalized Summary" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+        <p className="text-sm text-rose-700">Unable to generate summary at this time.</p>
+      </section>
+    )
+  }
+
+  if (!summary) {
+    return <AISummaryPlaceholder />
+  }
+
+  return (
+    <section aria-label="AI Personalized Summary" className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs text-white">✦</span>
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-500">AI Personalized Summary</h2>
+      </div>
+      <p className="text-sm leading-relaxed text-zinc-700 whitespace-pre-line">{summary}</p>
     </section>
   )
 }
@@ -283,8 +330,8 @@ export default function AuditResults({ results, totalMonthlySavings, onReset }: 
         </button>
       </header>
 
-      {/* ── AI Summary Placeholder ────────────────────────────────────────── */}
-      <AISummaryPlaceholder />
+      {/* ── AI Summary ────────────────────────────────────────── */}
+      <AISummary results={results} totalMonthlySavings={totalMonthlySavings} />
 
       {/* ── CTA Banner (conditional) ──────────────────────────────────────── */}
       {totalMonthlySavings > 500 ? (
