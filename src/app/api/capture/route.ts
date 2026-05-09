@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { supabase, toLeadRow } from "@/lib/supabase";
+import { getSupabase, toLeadRow } from "@/lib/supabase";
 import type { AuditResult } from "@/types/audit";
 
 // ─── Resend Client ─────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── 4. Persist to Supabase ───────────────────────────────────────────────────
-  const { data, error: dbError } = await supabase
+  const { data, error: dbError } = await getSupabase()
     .from("leads")
     .insert([
       toLeadRow({

@@ -1,31 +1,39 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AuditResult } from "@/types/audit";
 
-// ─── Environment Guards ────────────────────────────────────────────────────────
+// ─── Lazy Client Singleton (server-only, uses service role) ───────────────────
+//
+// We intentionally defer env-var validation to the first *call* of getSupabase()
+// rather than throwing at module load time.  Next.js evaluates route modules
+// during the build's page-data collection step — throwing at that point would
+// break `npm run build` in any environment that doesn't inject secrets (CI, etc.)
+//
+// NEVER export or call this from browser code.
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let _client: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error(
-    "Missing Supabase env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set."
-  );
+export function getSupabase(): SupabaseClient {
+  if (_client) return _client;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      "Missing Supabase env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set."
+    );
+  }
+
+  _client = createClient(url, key, {
+    auth: {
+      // Service-role clients don't need session persistence.
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  return _client;
 }
-
-// ─── Client Singleton (server-only, uses service role) ────────────────────────
-
-/**
- * Server-side Supabase client using the service-role key.
- * NEVER expose this client to the browser — import only from API routes or
- * server components.
- */
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    // Service-role clients don't need session persistence.
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
 
 // ─── Database Types ────────────────────────────────────────────────────────────
 

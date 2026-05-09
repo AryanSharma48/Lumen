@@ -20,4 +20,12 @@ jobs:
     - run: npm ci
     - run: npm run lint
     - run: npm test
-    - run: npm run build
+    - name: Build
+      run: npm run build
+      env:
+        # Stub values so Next.js build-time static analysis doesn't fail.
+        # Real secrets are only needed at runtime, not during the build.
+        SUPABASE_URL: https://placeholder.supabase.co
+        SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role_key
+        RESEND_API_KEY: re_placeholder
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
