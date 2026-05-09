@@ -28,4 +28,5 @@ jobs:
         SUPABASE_URL: https://placeholder.supabase.co
         SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role_key
         RESEND_API_KEY: re_placeholder
+        GEMINI_API_KEY: AIza_placeholder
         NEXT_PUBLIC_APP_URL: http://localhost:3000

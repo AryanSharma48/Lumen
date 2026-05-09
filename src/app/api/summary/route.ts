@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import type { AuditResult } from "@/types/audit";
 
-// ─── Anthropic Client (lazy, server-only) ─────────────────────────────────────
+// ─── Gemini Client (lazy, server-only) ────────────────────────────────────────
 
-let _anthropic: Anthropic | null = null;
+let _gemini: GoogleGenAI | null = null;
 
-function getAnthropic(): Anthropic {
-  if (_anthropic) return _anthropic;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY is not set.");
-  _anthropic = new Anthropic({ apiKey: key });
-  return _anthropic;
+function getGemini(): GoogleGenAI {
+  if (_gemini) return _gemini;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set.");
+  _gemini = new GoogleGenAI({ apiKey: key });
+  return _gemini;
 }
 
 // ─── Request Shape ─────────────────────────────────────────────────────────────
@@ -24,8 +24,8 @@ interface SummaryPayload {
 // ─── Fallback Template ────────────────────────────────────────────────────────
 
 /**
- * Deterministic fallback used whenever the Anthropic call fails (429, timeout,
- * missing key, network error, etc.).  Never crashes the user's flow.
+ * Deterministic fallback used whenever the Gemini call fails (429, timeout,
+ * missing key, network error, etc.). Never crashes the user's flow.
  */
 function buildFallbackSummary(
   results: AuditResult[],
@@ -105,43 +105,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "results must be a non-empty array." }, { status: 422 });
   }
 
-  // ── 2. Call Anthropic with full error isolation ───────────────────────────────
+  // ── 2. Call Gemini with full error isolation ─────────────────────────────────
   try {
-    const client = getAnthropic();
+    const ai = getGemini();
 
-    const message = await client.messages.create(
-      {
-        model: "claude-3-5-haiku-20241022", // fast + cheap for ~100 word output
-        max_tokens: 200,
-        messages: [
-          {
-            role: "user",
-            content: buildPrompt(results, totalMonthlySavings),
-          },
-        ],
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash", // Fast and cheap for ~100 word output
+      contents: buildPrompt(results, totalMonthlySavings),
+      config: {
+        maxOutputTokens: 200,
       },
-      {
-        // Abort if Anthropic takes more than 8 seconds — keep p99 latency
-        // within Next.js's default serverless function window.
-        timeout: 8_000,
-      }
-    );
+    });
 
-    const block = message.content[0];
-    if (block.type !== "text") {
-      throw new Error("Unexpected content block type from Anthropic.");
+    const text = response.text;
+    if (!text) {
+      throw new Error("Unexpected empty response from Gemini.");
     }
 
-    return NextResponse.json({ summary: block.text.trim() });
+    return NextResponse.json({ summary: text.trim() });
   } catch (err: unknown) {
     // Log the real error server-side but NEVER crash the client.
-    // This covers: missing API key, 429 rate-limit, network timeout, SDK errors.
-    const isRateLimit =
-      err instanceof Anthropic.RateLimitError ||
-      (err instanceof Anthropic.APIError && err.status === 429);
-
     console.warn(
-      `[summary] Anthropic call failed (${isRateLimit ? "rate-limited" : "error"}) — serving fallback.`,
+      `[summary] Gemini call failed — serving fallback.`,
       err instanceof Error ? err.message : err
     );
 
