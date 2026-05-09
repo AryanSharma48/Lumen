@@ -113,7 +113,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       model: "gemini-2.5-flash", // Fast and cheap for ~100 word output
       contents: buildPrompt(results, totalMonthlySavings),
       config: {
-        maxOutputTokens: 200,
+        maxOutputTokens: 2048,
       },
     });
 
