@@ -25,3 +25,10 @@
 **What I learned:** Gemini 2.5 models consume a significant portion of their maxOutputTokens allowance as hidden 'thinking tokens'. If the max is set too low (e.g. 200), the response will silently cut off mid-sentence because the model used up 190 tokens just to 'think' about the response.
 **Blockers / what I'm stuck on:** Waiting to deploy and test the Supabase edge functions/tables in production.
 **Plan for tomorrow:** Launch preparation.
+
+## Day 5 2026-05-11
+**Hours worked:** 5
+**What I did:** Executed final production readiness audits and UI polish. Fixed text-wrapping and flex-shrink issues in the success state of `EmailCapture`. Stripped third-party placeholder branding from CTAs and Resend email templates. Added global error handling and comprehensive server-side logging to `/api/capture`. Rewrote project documentation (`README.md`, `ARCHITECTURE.md`, `PROMPTS.md`) to perfectly reflect the actual deployed state and MVP execution limits. 
+**What I learned:** Scaling serverless applications with HTTP/REST APIs (like Supabase's PostgREST) natively avoids the TCP connection exhaustion problems that typically require PgBouncer. Documentation drifts quickly from implementation; strict audits are necessary to align them.
+**Blockers / what I'm stuck on:** None. The application is fully ready for deployment.
+**Plan for tomorrow:** Marketing, distribution, and monitoring the launch.
