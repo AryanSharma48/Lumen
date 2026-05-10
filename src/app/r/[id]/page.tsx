@@ -19,13 +19,14 @@ interface PageProps {
 async function getPublicAuditData(id: string) {
   const { data, error } = await getSupabase()
     .from("leads")
-    .select("total_monthly_savings, audit_data")
+    .select("total_monthly_savings, audit_data, team_size")
     .eq("id", id)
     .single();
 
   if (error || !data) return null;
 
   return {
+    team: { teamSize: data.team_size as number, primaryUseCase: "coding" as const },
     totalMonthlySavings: data.total_monthly_savings as number,
     auditData: data.audit_data as AuditResult[],
   };
@@ -91,6 +92,7 @@ export default async function SharedReportPage({ params }: PageProps) {
         </div>
       </div>
       <AuditResults
+        team={lead.team}
         results={lead.auditData}
         totalMonthlySavings={lead.totalMonthlySavings}
         onReset={handleReset}

@@ -30,87 +30,101 @@ interface CapturePayload {
 // ─── POST Handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // ── 1. Parse body ────────────────────────────────────────────────────────────
-  let body: CapturePayload;
   try {
-    body = (await req.json()) as CapturePayload;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+    // ── 1. Parse body ────────────────────────────────────────────────────────────
+    let body: CapturePayload;
+    try {
+      body = (await req.json()) as CapturePayload;
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
 
-  // ── 2. Honeypot check ────────────────────────────────────────────────────────
-  // Real users never see or fill the `_hp` field.  If it has a value, silently
-  // return 200 so bots think the submission succeeded.
-  if (body._hp) {
-    return NextResponse.json({ ok: true });
-  }
+    // ── 2. Honeypot check ────────────────────────────────────────────────────────
+    if (body._hp) {
+      return NextResponse.json({ ok: true });
+    }
 
-  // ── 3. Basic validation ──────────────────────────────────────────────────────
-  const { email, companyName, teamSize, totalMonthlySavings, auditData } = body;
+    // ── 3. Basic validation ──────────────────────────────────────────────────────
+    const { email, companyName, teamSize, totalMonthlySavings, auditData } = body;
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    return NextResponse.json({ error: "A valid email is required." }, { status: 422 });
-  }
-  if (typeof teamSize !== "number" || teamSize < 1) {
-    return NextResponse.json({ error: "teamSize must be a positive integer." }, { status: 422 });
-  }
-  if (!Array.isArray(auditData) || auditData.length === 0) {
-    return NextResponse.json({ error: "auditData must be a non-empty array." }, { status: 422 });
-  }
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json({ error: "A valid email is required." }, { status: 422 });
+    }
+    if (typeof teamSize !== "number" || teamSize < 1) {
+      return NextResponse.json({ error: "teamSize must be a positive integer." }, { status: 422 });
+    }
+    if (!Array.isArray(auditData) || auditData.length === 0) {
+      return NextResponse.json({ error: "auditData must be a non-empty array." }, { status: 422 });
+    }
 
-  // ── 4. Persist to Supabase ───────────────────────────────────────────────────
-  const { data, error: dbError } = await getSupabase()
-    .from("leads")
-    .insert([
-      toLeadRow({
-        email,
-        companyName: companyName ?? null,
-        teamSize,
-        totalMonthlySavings,
-        auditData,
-      }),
-    ])
-    .select("id")
-    .single();
+    // ── 4. Persist to Supabase ───────────────────────────────────────────────────
+    const { data, error: dbError } = await getSupabase()
+      .from("leads")
+      .insert([
+        toLeadRow({
+          email,
+          companyName: companyName ?? null,
+          teamSize,
+          totalMonthlySavings,
+          auditData,
+        }),
+      ])
+      .select("id")
+      .single();
 
-  if (dbError || !data) {
-    console.error("[capture] Supabase insert error:", dbError);
+    if (dbError || !data) {
+      console.error("[capture] Supabase insert error:", dbError);
+      return NextResponse.json(
+        { 
+          error: "Failed to save your audit. Please try again.",
+          details: process.env.NODE_ENV === 'development' ? dbError : undefined
+        },
+        { status: 500 }
+      );
+    }
+
+    const leadId: string = data.id as string;
+
+    // ── 5. Send confirmation email via Resend ────────────────────────────────────
+    const formattedSavings = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(totalMonthlySavings);
+
+    try {
+      const { error: emailError } = await resend.emails.send({
+        from: "Lumen <noreply@lumen.app>",
+        to: [email],
+        subject: `Your AI Spend Audit is saved — ${formattedSavings}/mo in potential savings`,
+        html: buildEmailHtml({
+          email,
+          companyName: companyName ?? null,
+          formattedSavings,
+          willBeContacted: totalMonthlySavings > 500,
+          leadId,
+        }),
+      });
+
+      if (emailError) {
+        console.warn("[capture] Resend email error:", emailError);
+      }
+    } catch (e) {
+      console.error("[capture] Resend critical error:", e);
+    }
+
+    // ── 6. Return the lead id for viral-share links ──────────────────────────────
+    return NextResponse.json({ ok: true, id: leadId }, { status: 201 });
+  } catch (globalError) {
+    console.error("[capture] Global crash:", globalError);
     return NextResponse.json(
-      { error: "Failed to save your audit. Please try again." },
+      { 
+        error: "Internal server error.",
+        message: globalError instanceof Error ? globalError.message : String(globalError)
+      }, 
       { status: 500 }
     );
   }
-
-  const leadId: string = data.id as string;
-
-  // ── 5. Send confirmation email via Resend ────────────────────────────────────
-  const willBeContacted = totalMonthlySavings > 500;
-  const formattedSavings = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(totalMonthlySavings);
-
-  const { error: emailError } = await resend.emails.send({
-    from: "Lumen by Credex <noreply@credex.ai>",
-    to: [email],
-    subject: `Your AI Spend Audit is saved — ${formattedSavings}/mo in potential savings`,
-    html: buildEmailHtml({
-      email,
-      companyName: companyName ?? null,
-      formattedSavings,
-      willBeContacted,
-      leadId,
-    }),
-  });
-
-  if (emailError) {
-    // Non-fatal: lead is already saved. Log and continue.
-    console.warn("[capture] Resend email error:", emailError);
-  }
-
-  // ── 6. Return the lead id for viral-share links ──────────────────────────────
-  return NextResponse.json({ ok: true, id: leadId }, { status: 201 });
 }
 
 // ─── Email Template ────────────────────────────────────────────────────────────
@@ -133,7 +147,7 @@ function buildEmailHtml({
   const outreachNote = willBeContacted
     ? `<p style="margin:16px 0;padding:12px 16px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:4px;color:#166534;">
         <strong>🎉 Great news:</strong> Your projected savings exceed <strong>${formattedSavings}/mo</strong>.
-        A Credex representative will reach out shortly to walk you through a tailored consolidation plan.
+        An expert will reach out shortly to walk you through a tailored consolidation plan.
       </p>`
     : "";
 
@@ -151,7 +165,7 @@ function buildEmailHtml({
     <tr>
       <td style="background:linear-gradient(135deg,#6366f1,#a855f7);padding:32px 40px;">
         <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Lumen</h1>
-        <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">AI Spend Intelligence by Credex</p>
+        <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">AI Spend Intelligence</p>
       </td>
     </tr>
     <!-- Body -->
@@ -181,7 +195,7 @@ function buildEmailHtml({
         <p style="margin:24px 0 8px;font-size:15px;line-height:1.6;color:#a3a3a3;">
           Your audit report is ready to share. Use the link below:
         </p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL ?? "https://lumen.credex.ai"}/report/${leadId}"
+        <a href="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/r/${leadId}"
            style="display:inline-block;margin:8px 0 24px;padding:12px 24px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">
           View Your Report →
         </a>
@@ -194,7 +208,7 @@ function buildEmailHtml({
     <tr>
       <td style="padding:20px 40px;border-top:1px solid #2a2a2a;">
         <p style="margin:0;font-size:12px;color:#4b5563;line-height:1.6;">
-          © ${new Date().getFullYear()} Credex Inc. · You received this because you submitted an audit at lumen.credex.ai.
+          © ${new Date().getFullYear()} Lumen.
         </p>
       </td>
     </tr>

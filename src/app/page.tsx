@@ -30,6 +30,7 @@ export default function Home() {
         </div>
       ) : (
         <AuditResults
+          team={report.team}
           results={report.results}
           totalMonthlySavings={report.totalMonthlySavings}
           onReset={handleReset}

@@ -120,6 +120,7 @@ export interface AuditResult {
 
 /** Aggregate output returned by the audit engine. */
 export interface AuditReport {
+  team: TeamData;
   results: AuditResult[];
   totalMonthlySavings: number;
   totalAnnualSavings: number;

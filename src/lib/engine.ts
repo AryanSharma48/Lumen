@@ -340,7 +340,7 @@ export function runAudit(teamOrForm: TeamData | FormState, toolsArg?: ToolState[
   }
 
   if (tools.length === 0) {
-    return { results: [], totalMonthlySavings: 0, totalAnnualSavings: 0 };
+    return { team, results: [], totalMonthlySavings: 0, totalAnnualSavings: 0 };
   }
 
   // Track which tool IDs have been handled by a global rule
@@ -384,5 +384,5 @@ export function runAudit(teamOrForm: TeamData | FormState, toolsArg?: ToolState[
   const totalMonthlySavings = +results.reduce((s, r) => s + r.monthlySavings, 0).toFixed(2);
   const totalAnnualSavings  = +(totalMonthlySavings * 12).toFixed(2);
 
-  return { results, totalMonthlySavings, totalAnnualSavings };
+  return { team, results, totalMonthlySavings, totalAnnualSavings };
 }
