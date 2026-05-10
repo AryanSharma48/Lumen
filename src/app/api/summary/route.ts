@@ -62,30 +62,22 @@ function buildFallbackSummary(
 // ─── Prompt Builder ───────────────────────────────────────────────────────────
 
 function buildPrompt(results: AuditResult[], totalMonthlySavings: number): string {
-  const fmt = (n: number) =>
-    n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const systemPrompt = `You are a ruthless, highly analytical Staff Cloud Architect auditing a startup's AI spend. 
+Analyze the provided JSON audit data and write a brutally direct, 3-sentence executive summary.
 
-  const toolLines = results
-    .map(
-      (r) =>
-        `- ${r.toolName}: ${fmt(r.currentSpend ?? 0)}/mo current, action=${r.recommendedAction}, savings=${fmt(r.monthlySavings)}/mo. Reason: ${r.reasoning ?? r.reason ?? "N/A"}`
-    )
-    .join("\n");
+STRICT CONSTRAINTS:
+1. NO corporate fluff, filler words, or narrative storytelling (e.g., avoid "financial agility", "operational capital", "strategic adjustment").
+2. State the total monthly savings and the single biggest inefficiency directly.
+3. CONDITIONAL CTA: If totalMonthlySavings > 500, your final sentence MUST BE exactly: "Your spend indicates Enterprise tier readiness. Book a consultation with Credex to consolidate contracts and unlock volume discounts."
+4. If totalMonthlySavings < 100, commend them for maintaining a lean, optimized stack.
 
-  return `You are a terse, data-driven financial analyst specialising in SaaS procurement for software teams.
+Output plain text only. Do not use markdown.`;
 
-A team's AI spend audit produced these results:
-${toolLines}
+  return `${systemPrompt}
 
-Total monthly savings identified: ${fmt(totalMonthlySavings)}
-
-Write a personalised, confident summary of their AI stack efficiency in EXACTLY 80–110 words. Rules:
-- Start with a strong, specific opening that references their total savings figure.
-- Mention 1–2 specific tools and their recommended action by name.
-- End with one sentence about the business impact of acting on this.
-- Do NOT use bullet points, headers, or markdown.
-- Write in second person ("your stack", "you are").
-- Plain prose only.`;
+JSON Audit Data:
+${JSON.stringify(results, null, 2)}
+totalMonthlySavings: ${totalMonthlySavings}`;
 }
 
 // ─── POST Handler ─────────────────────────────────────────────────────────────

@@ -19,6 +19,6 @@ The silent honeypot is insufficient against coordinated botnets. At 10k requests
 Currently, the `/api/summary` route synchronously awaits the Gemini API response. At high volume, downstream LLM latency spikes will cause Vercel serverless functions to hang and timeout.
 * **Impact:** Migrate the LLM call to an asynchronous background worker (e.g., Inngest or Upstash QStash). The UI would immediately render the deterministic math, and the AI summary skeleton would poll or use Server-Sent Events (SSE) to stream in once the background job completes.
 
-### 3. Database Connection Pooling
-10,000 daily audits driven by viral traffic spikes (e.g., a top post on HackerNews) will cause Next.js serverless functions to rapidly spin up, potentially exhausting Supabase's direct connection limits.
-* **Impact:** Route all database traffic through Supabase's PgBouncer (connection pooling) to ensure connections are safely multiplexed across stateless Next.js invocations.
+### 3. Database Caching for Viral Reads
+Currently, the public report route (`/r/[id]`) queries Supabase directly on every page load. Because the MVP uses the `@supabase/supabase-js` client (which operates over the HTTP PostgREST API), we are actually protected from the TCP connection exhaustion typical of serverless functions—meaning PgBouncer is not required for the current architecture. However, viral traffic will still hammer the REST API with redundant read queries.
+* **Impact:** Implement Next.js Data Cache (`force-cache` with revalidation) or an Edge cache (Upstash Redis) for public report reads (`/r/[id]`). This prevents excessive database egress and drastically lowers latency for global users viewing viral reports.
