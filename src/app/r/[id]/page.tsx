@@ -101,6 +101,7 @@ export default async function SharedReportPage({ params }: PageProps) {
         </div>
       </div>
       <AuditResults
+        id={id}
         team={lead.team}
         results={lead.auditData}
         totalMonthlySavings={lead.totalMonthlySavings}

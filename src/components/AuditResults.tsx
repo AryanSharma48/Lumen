@@ -6,6 +6,7 @@ import type { AuditResult, ActionType, TeamData } from '@/types/audit'
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface AuditResultsProps {
+  id?: string
   team?: TeamData
   results: AuditResult[]
   totalMonthlySavings: number
@@ -38,6 +39,7 @@ function EmailCapture({
   results,
   totalMonthlySavings,
   team,
+  onSuccess,
 }: {
   id: string
   label: string
@@ -47,6 +49,7 @@ function EmailCapture({
   results: AuditResult[]
   totalMonthlySavings: number
   team?: TeamData
+  onSuccess?: (id: string) => void
 }) {
   const [email, setEmail] = useState('')
   const [companyName, setCompanyName] = useState('')
@@ -76,7 +79,11 @@ function EmailCapture({
       })
 
       if (!res.ok) throw new Error('Capture failed')
+      const data = await res.json()
       setStatus('success')
+      if (onSuccess && data.id) {
+        onSuccess(data.id)
+      }
     } catch (err) {
       console.error('[capture] Error:', err)
       setStatus('error')
@@ -260,7 +267,7 @@ function ToolCard({ result }: { result: AuditResult }) {
 
 // ─── CTA Banners ─────────────────────────────────────────────────────────────
 
-function HighSavingsCTA({ monthly, results, team }: { monthly: number; results: AuditResult[]; team?: TeamData }) {
+function HighSavingsCTA({ monthly, results, team, onSuccess }: { monthly: number; results: AuditResult[]; team?: TeamData; onSuccess?: (id: string) => void }) {
   return (
     <section
       aria-label="Executive Consultation"
@@ -272,7 +279,7 @@ function HighSavingsCTA({ monthly, results, team }: { monthly: number; results: 
         className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 opacity-30 blur-[100px]"
       />
       <div className="relative">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-violet-400">
           Executive Consultation
         </p>
         <h2 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
@@ -290,10 +297,11 @@ function HighSavingsCTA({ monthly, results, team }: { monthly: number; results: 
             label="Email for expert consultation"
             placeholder="you@company.com"
             buttonText="Book Free Call →"
-            buttonClass="bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-600/30"
+            buttonClass="bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-600/20"
             results={results}
             totalMonthlySavings={monthly}
             team={team}
+            onSuccess={onSuccess}
           />
         </div>
       </div>
@@ -301,7 +309,7 @@ function HighSavingsCTA({ monthly, results, team }: { monthly: number; results: 
   )
 }
 
-function OptimizedCTA({ results, monthly, team }: { results: AuditResult[]; monthly: number; team?: TeamData }) {
+function OptimizedCTA({ results, monthly, team, onSuccess }: { results: AuditResult[]; monthly: number; team?: TeamData; onSuccess?: (id: string) => void }) {
   return (
     <section
       aria-label="Stack already optimized"
@@ -323,13 +331,14 @@ function OptimizedCTA({ results, monthly, team }: { results: AuditResult[]; mont
           results={results}
           totalMonthlySavings={monthly}
           team={team}
+          onSuccess={onSuccess}
         />
       </div>
     </section>
   )
 }
 
-function StandardCTA({ results, monthly, team }: { results: AuditResult[]; monthly: number; team?: TeamData }) {
+function StandardCTA({ results, monthly, team, onSuccess }: { results: AuditResult[]; monthly: number; team?: TeamData; onSuccess?: (id: string) => void }) {
   return (
     <section
       aria-label="Save this report"
@@ -351,6 +360,7 @@ function StandardCTA({ results, monthly, team }: { results: AuditResult[]; month
           results={results}
           totalMonthlySavings={monthly}
           team={team}
+          onSuccess={onSuccess}
         />
       </div>
     </section>
@@ -359,9 +369,39 @@ function StandardCTA({ results, monthly, team }: { results: AuditResult[]; month
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function AuditResults({ team, results, totalMonthlySavings, onReset }: AuditResultsProps) {
+export default function AuditResults({ id, team, results, totalMonthlySavings, onReset }: AuditResultsProps) {
+  const [copied, setCopied] = useState(false)
+  const [reportId, setReportId] = useState<string | undefined>(id)
   const annualSavings = totalMonthlySavings * 12
   const hasResults = results.length > 0
+
+  const handleShare = async () => {
+    const baseUrl = window.location.origin
+    const url = reportId ? `${baseUrl}/r/${reportId}` : window.location.href
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Lumen AI Spend Audit',
+          text: `I just found ${fmt(totalMonthlySavings)}/mo in potential AI tool savings with Lumen!`,
+          url: url,
+        })
+      } catch (err) {
+        // User might have cancelled share sheet
+        if ((err as Error).name !== 'AbortError') {
+          console.error('Error sharing:', err)
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } catch (err) {
+        console.error('Error copying to clipboard:', err)
+      }
+    }
+  }
 
   // Sort: highest savings first, OPTIMAL last
   const sorted = [...results].sort((a, b) => b.monthlySavings - a.monthlySavings)
@@ -395,13 +435,43 @@ export default function AuditResults({ team, results, totalMonthlySavings, onRes
             </p>
           </>
         )}
-        <button
-          onClick={onReset}
-          id="audit-reset-btn"
-          className="mt-6 rounded-full border border-zinc-700 px-5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
-        >
-          ← Start over
-        </button>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={onReset}
+            id="audit-reset-btn"
+            className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-zinc-500 hover:text-white active:scale-95"
+          >
+            ← Start over
+          </button>
+          
+          {reportId ? (
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2 text-sm font-bold text-white transition-all hover:bg-violet-500 active:scale-95 shadow-lg shadow-violet-600/20 animate-in fade-in zoom-in-95 duration-300"
+            >
+              {copied ? (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Share Report
+                </>
+              )}
+            </button>
+          ) : (
+            <p className="flex items-center gap-2 text-xs font-medium text-zinc-500 animate-in fade-in duration-500">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-violet-500/50"></span>
+              Enter your email below to share this report
+            </p>
+          )}
+        </div>
       </header>
 
       {/* ── AI Summary ────────────────────────────────────────── */}
@@ -409,11 +479,11 @@ export default function AuditResults({ team, results, totalMonthlySavings, onRes
 
       {/* ── CTA Banner (conditional) ──────────────────────────────────────── */}
       {totalMonthlySavings > 500 ? (
-        <HighSavingsCTA monthly={totalMonthlySavings} results={results} team={team} />
+        <HighSavingsCTA monthly={totalMonthlySavings} results={results} team={team} onSuccess={setReportId} />
       ) : totalMonthlySavings < 100 ? (
-        <OptimizedCTA results={results} monthly={totalMonthlySavings} team={team} />
+        <OptimizedCTA results={results} monthly={totalMonthlySavings} team={team} onSuccess={setReportId} />
       ) : (
-        <StandardCTA results={results} monthly={totalMonthlySavings} team={team} />
+        <StandardCTA results={results} monthly={totalMonthlySavings} team={team} onSuccess={setReportId} />
       )}
 
       {/* ── Per-Tool Breakdown ────────────────────────────────────────────── */}
