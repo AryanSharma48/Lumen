@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useCallback } from 'react'
 import type { FormState, ToolName, PlanName, UseCase, ToolState } from '@/types/audit'
+import { TOOL_PRICING } from '@/lib/engine'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,14 +48,16 @@ const DEFAULT_FORM: FormState = {
 function makeToolRow(overrides: Partial<ToolState> = {}): ToolState {
   const toolName: ToolName = overrides.toolName ?? overrides.name ?? 'Cursor'
   const planName: PlanName = overrides.planName ?? overrides.plan ?? PLANS_BY_TOOL[toolName][0]
+  const pricePerSeat = TOOL_PRICING[toolName]?.[planName] ?? 0
+  const seats = overrides.seats ?? 1
   return {
     id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     toolName,
     name: toolName,
     planName,
     plan: planName,
-    monthlySpend: 0,
-    seats: 1,
+    monthlySpend: overrides.monthlySpend ?? (pricePerSeat * seats),
+    seats,
     ...overrides,
   }
 }
@@ -63,7 +66,7 @@ function makeToolRow(overrides: Partial<ToolState> = {}): ToolState {
 
 type Action =
   | { type: 'LOAD_STATE'; payload: FormState }
-  | { type: 'SET_TEAM_SIZE'; payload: number }
+  | { type: 'SET_TEAM_SIZE'; payload: number | '' }
   | { type: 'SET_USE_CASE'; payload: UseCase }
   | { type: 'ADD_TOOL' }
   | { type: 'REMOVE_TOOL'; id: string }
@@ -75,7 +78,7 @@ function reducer(state: FormState, action: Action): FormState {
       return action.payload
 
     case 'SET_TEAM_SIZE':
-      return { ...state, team: { ...state.team, teamSize: action.payload } }
+      return { ...state, team: { ...state.team, teamSize: action.payload as any } }
 
     case 'SET_USE_CASE':
       return { ...state, team: { ...state.team, useCase: action.payload, primaryUseCase: action.payload } }
@@ -90,15 +93,30 @@ function reducer(state: FormState, action: Action): FormState {
       const tools = state.tools.map((t) => {
         if (t.id !== action.id) return t
         const updated = { ...t, [action.field]: action.value }
+        
+        let recalculateSpend = false
         if (action.field === 'toolName') {
           const newTool = action.value as ToolName
           updated.toolName = newTool
           updated.name = newTool
           updated.planName = PLANS_BY_TOOL[newTool][0]
           updated.plan = updated.planName
+          recalculateSpend = true
         }
         if (action.field === 'planName') {
           updated.plan = action.value as PlanName
+          recalculateSpend = true
+        }
+        if (action.field === 'seats') {
+          recalculateSpend = true
+        }
+
+        if (recalculateSpend) {
+          const price = TOOL_PRICING[updated.name]?.[updated.plan]
+          if (price != null) {
+            const currentSeats = (updated.seats as any) === '' ? 1 : Number(updated.seats)
+            updated.monthlySpend = price * currentSeats
+          }
         }
         return updated
       })
@@ -154,15 +172,27 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
   const handleToolChange = useCallback(
     (id: string, field: keyof ToolState, raw: string) => {
       const numericFields: (keyof ToolState)[] = ['monthlySpend', 'seats']
-      const value = numericFields.includes(field) ? parseFloat(raw) || 0 : raw
-      dispatch({ type: 'UPDATE_TOOL', id, field, value })
+      const value = numericFields.includes(field) ? (raw === '' ? '' : parseFloat(raw)) : raw
+      dispatch({ type: 'UPDATE_TOOL', id, field, value: value as any })
     },
     []
   )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(state)
+    const normalizedState: FormState = {
+      ...state,
+      team: {
+        ...state.team,
+        teamSize: (state.team.teamSize as any) === '' ? 1 : Math.max(1, Number(state.team.teamSize)),
+      },
+      tools: state.tools.map((t) => ({
+        ...t,
+        monthlySpend: (t.monthlySpend as any) === '' ? 0 : Number(t.monthlySpend),
+        seats: (t.seats as any) === '' ? 1 : Number(t.seats),
+      })),
+    }
+    onSubmit(normalizedState)
   }
 
   const canSubmit = state.tools.length > 0
@@ -176,16 +206,16 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="team-size" className={labelCls}>Team size</label>
-            <input
-              id="team-size"
-              type="number"
-              min={1}
-              value={state.team.teamSize}
-              onChange={(e) =>
-                dispatch({ type: 'SET_TEAM_SIZE', payload: parseInt(e.target.value) || 1 })
-              }
-              className={inputCls}
-            />
+              <input
+                id="team-size"
+                type="number"
+                min={1}
+                value={state.team.teamSize}
+                onChange={(e) =>
+                  dispatch({ type: 'SET_TEAM_SIZE', payload: e.target.value === '' ? '' : parseInt(e.target.value) })
+                }
+                className={inputCls}
+              />
           </div>
           <div>
             <label htmlFor="use-case" className={labelCls}>Primary use case</label>
@@ -265,7 +295,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
                   id={`tool-spend-${tool.id}`}
                   type="number"
                   min={0}
-                  step={0.01}
+                  step={5}
                   value={tool.monthlySpend}
                   onChange={(e) => handleToolChange(tool.id, 'monthlySpend', e.target.value)}
                   className={inputCls}

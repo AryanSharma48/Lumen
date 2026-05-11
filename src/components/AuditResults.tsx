@@ -121,7 +121,7 @@ function EmailCapture({
       <button
         type="submit"
         disabled={status === 'loading'}
-        className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${buttonClass}`}
+        className={`whitespace-nowrap shrink-0 rounded-lg px-6 py-2.5 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${buttonClass}`}
       >
         {status === 'loading' ? 'Sending...' : buttonText}
       </button>
@@ -261,7 +261,7 @@ function HighSavingsCTA({ monthly, results, team }: { monthly: number; results: 
           <span className="opacity-90">Let&apos;s capture every dollar.</span>
         </h2>
         <p className="mt-4 max-w-lg text-base leading-relaxed text-zinc-400">
-          Our experts specialise in AI procurement and vendor negotiation. Book a free 30-minute strategy
+          Our experts at Credex specialise in AI procurement and vendor negotiation. Book a free 30-minute strategy
           call and we&apos;ll map a concrete implementation plan.
         </p>
         <div className="mt-8">
@@ -293,7 +293,7 @@ function OptimizedCTA({ results, monthly, team }: { results: AuditResult[]; mont
           You&apos;re spending well. Get notified when AI pricing changes affect your tools.
         </p>
       </div>
-      <div className="min-w-0 sm:w-80">
+      <div className="min-w-0 sm:w-96">
         <EmailCapture
           id="cta-optimized-email"
           label="Email for pricing alerts"
@@ -321,7 +321,7 @@ function StandardCTA({ results, monthly, team }: { results: AuditResult[]; month
           We&apos;ll email you a full breakdown with implementation steps.
         </p>
       </div>
-      <div className="min-w-0 sm:w-80">
+      <div className="min-w-0 sm:w-96">
         <EmailCapture
           id="cta-standard-email"
           label="Email to save report"
@@ -347,12 +347,12 @@ export default function AuditResults({ team, results, totalMonthlySavings, onRes
   const sorted = [...results].sort((a, b) => b.monthlySavings - a.monthlySavings)
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6">
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <header className="rounded-2xl bg-zinc-900 px-6 py-10 text-center text-white shadow-xl sm:px-10">
         <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
-          Lumen Audit Report
+          Lumen Audit Report by Credex
         </p>
         {totalMonthlySavings > 0 ? (
           <>

@@ -23,7 +23,9 @@ export default function Home() {
       {report === null ? (
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900">Lumen</h1>
+            <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900">
+              Lumen
+            </h1>
             <p className="mt-2 text-zinc-500">Audit your AI spend. Find what you&apos;re wasting.</p>
           </div>
           <SpendForm onSubmit={handleSubmit} />

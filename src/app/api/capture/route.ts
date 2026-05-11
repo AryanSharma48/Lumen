@@ -147,7 +147,7 @@ function buildEmailHtml({
   const outreachNote = willBeContacted
     ? `<p style="margin:16px 0;padding:12px 16px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:4px;color:#166534;">
         <strong>🎉 Great news:</strong> Your projected savings exceed <strong>${formattedSavings}/mo</strong>.
-        An expert will reach out shortly to walk you through a tailored consolidation plan.
+        A Credex expert will reach out shortly to walk you through a tailored consolidation plan.
       </p>`
     : "";
 
@@ -165,7 +165,7 @@ function buildEmailHtml({
     <tr>
       <td style="background:linear-gradient(135deg,#6366f1,#a855f7);padding:32px 40px;">
         <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Lumen</h1>
-        <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">AI Spend Intelligence</p>
+        <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">AI Spend Intelligence by Credex</p>
       </td>
     </tr>
     <!-- Body -->
@@ -208,7 +208,7 @@ function buildEmailHtml({
     <tr>
       <td style="padding:20px 40px;border-top:1px solid #2a2a2a;">
         <p style="margin:0;font-size:12px;color:#4b5563;line-height:1.6;">
-          © ${new Date().getFullYear()} Lumen.
+          © ${new Date().getFullYear()} Lumen by Credex.
         </p>
       </td>
     </tr>
