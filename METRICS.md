@@ -17,4 +17,4 @@ I would immediately instrument the `audit_completed` backend event (using PostHo
 ### The Pivot Trigger
 **Threshold:** If 80% of completed audits return less than $100 in identified savings over a trailing 14-day period.
 * **Interpretation:** This explicitly invalidates our GTM assumption. It means our distribution channels are capturing "Hobbyist" developers on free tiers, rather than our target Pre-Series A engineering managers with bloated stacks.
-* **Action:** I would halt the current outbound motion and pivot upstream. We would rewrite the landing page copy and shift outreach entirely to Series B+ Fractional CFOs, where massive overlapping "Enterprise" contract wastage is mathematically guaranteed.
+* **Action:** I would halt the current outbound motion and pivot upstream. I would rewrite the landing page copy and shift outreach entirely to Series B+ Fractional CFOs, where massive overlapping "Enterprise" contract wastage is mathematically guaranteed.

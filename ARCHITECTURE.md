@@ -7,8 +7,8 @@ graph TD
     User([User]) --> UI[Next.js Frontend]
     UI --> Engine[Audit Engine /lib/engine.ts]
     Engine --> UI
-    UI --> API_Capture[/api/capture]
-    UI --> API_Summary[/api/summary]
+    UI --> APICapture["/api/capture"]
+    UI --> APISummary["/api/summary"]
     
     API_Capture --> DB[(Supabase Postgres)]
     API_Capture --> Email[Resend API]
