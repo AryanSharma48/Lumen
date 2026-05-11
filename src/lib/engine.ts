@@ -221,7 +221,6 @@ function ruleCopilotRedundancy(
 
   // The tool flagged is whichever costs more
   const primaryTool = copilot.monthlySpend >= premiumLLM.monthlySpend ? copilot : premiumLLM;
-  const secondarySpend = primaryTool === copilot ? premiumLLM.monthlySpend : copilot.monthlySpend;
   const seats = Math.max(primaryTool.seats, 1);
 
   // Recommend consolidating to Cursor Business ($40/user)
@@ -272,7 +271,7 @@ function ruleApiEfficiency(tool: ToolState, team: TeamData): AuditResult | null 
 // ─── Per-Tool Fallback Evaluation ────────────────────────────────────────────
 // Runs after global rules so it only fires on tools not already flagged.
 
-function evaluateTool(tool: ToolState, team: TeamData): AuditResult {
+function evaluateTool(tool: ToolState): AuditResult {
   const seats = tool.seats;
   const spend  = tool.monthlySpend;
 
@@ -371,7 +370,7 @@ export function runAudit(teamOrForm: TeamData | FormState, toolsArg?: ToolState[
     if (r4) candidates.push(r4);
 
     // Fallback: generic same-vendor scan
-    const fallback = evaluateTool(tool, team);
+    const fallback = evaluateTool(tool);
     candidates.push(fallback);
 
     // Winner = highest savings (OPTIMAL has 0, so it only wins when no rule fires)

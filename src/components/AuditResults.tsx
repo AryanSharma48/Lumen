@@ -164,7 +164,7 @@ function AISummary({ results, totalMonthlySavings }: { results: AuditResult[], t
         if (!res.ok) throw new Error('Failed to fetch summary')
         const data = await res.json()
         if (!ignore) setSummary(data.summary)
-      } catch (err) {
+      } catch {
         if (!ignore) setError(true)
       }
     }
