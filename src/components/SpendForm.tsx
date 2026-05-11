@@ -18,14 +18,14 @@ const TOOL_NAMES: ToolName[] = [
 ]
 
 const PLANS_BY_TOOL: Record<ToolName, PlanName[]> = {
-  'Cursor':         ['Hobby', 'Pro', 'Pro+', 'Business', 'Enterprise'],
-  'GitHub Copilot': ['Free', 'Individual', 'Pro+', 'Business', 'Enterprise'],
-  'Claude':         ['Free', 'Pro', 'Team', 'Enterprise'],
-  'ChatGPT':        ['Free', 'Plus', 'Pro', 'Team', 'Enterprise'],
-  'Anthropic API':  ['Pay-as-you-go'],
-  'OpenAI API':     ['Pay-as-you-go'],
-  'Gemini':         ['Free', 'Advanced'],
-  'Windsurf':       ['Free', 'Pro', 'Teams', 'Enterprise'],
+  'Cursor':         ['Hobby', 'Pro', 'Business', 'Enterprise'],
+  'GitHub Copilot': ['Individual', 'Business', 'Enterprise'],
+  'Claude':         ['Free', 'Pro', 'Team (Standard Seat)', 'Team (Premium Seat)', 'Enterprise', 'API Direct'],
+  'ChatGPT':        ['Plus', 'Team', 'Enterprise', 'API Direct'],
+  'Anthropic API':  ['API Direct'],
+  'OpenAI API':     ['API Direct'],
+  'Gemini':         ['Free', 'Plus', 'Pro', 'Ultra', 'API Direct'],
+  'Windsurf':       ['Free', 'Pro', 'Max', 'Teams', 'Enterprise'],
 }
 
 const USE_CASES: { value: UseCase; label: string }[] = [
@@ -105,6 +105,9 @@ function reducer(state: FormState, action: Action): FormState {
         }
         if (action.field === 'planName') {
           updated.plan = action.value as PlanName
+          if (updated.name === 'Claude' && (updated.plan === 'Team (Standard Seat)' || updated.plan === 'Team (Premium Seat)')) {
+            if (Number(updated.seats) < 5) updated.seats = 5
+          }
           recalculateSpend = true
         }
         if (action.field === 'seats') {
@@ -114,7 +117,7 @@ function reducer(state: FormState, action: Action): FormState {
         if (recalculateSpend) {
           const price = TOOL_PRICING[updated.name]?.[updated.plan]
           if (price != null) {
-            const currentSeats = (updated.seats as unknown as string) === '' ? 1 : Number(updated.seats)
+            const currentSeats = (updated.seats as unknown as string) === '' ? 0 : Number(updated.seats)
             updated.monthlySpend = price * currentSeats
           }
         }
@@ -252,10 +255,10 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
           {state.tools.map((tool, idx) => (
             <div
               key={tool.id}
-              className="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-4"
+              className="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-12"
             >
               {/* Tool Name */}
-              <div>
+              <div className="sm:col-span-3">
                 <label htmlFor={`tool-name-${tool.id}`} className={labelCls}>
                   Tool {idx + 1}
                 </label>
@@ -272,7 +275,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
               </div>
 
               {/* Plan */}
-              <div>
+              <div className="sm:col-span-4">
                 <label htmlFor={`tool-plan-${tool.id}`} className={labelCls}>Plan</label>
                 <select
                   id={`tool-plan-${tool.id}`}
@@ -287,7 +290,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
               </div>
 
               {/* Monthly Spend */}
-              <div>
+              <div className="sm:col-span-3">
                 <label htmlFor={`tool-spend-${tool.id}`} className={labelCls}>
                   Monthly spend ($)
                 </label>
@@ -303,12 +306,12 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
               </div>
 
               {/* Seats + Remove */}
-              <div>
+              <div className="sm:col-span-2">
                 <label htmlFor={`tool-seats-${tool.id}`} className={labelCls}>Seats</label>
                 <input
                   id={`tool-seats-${tool.id}`}
                   type="number"
-                  min={0}
+                  min={(tool.name === 'Claude' && (tool.plan === 'Team (Standard Seat)' || tool.plan === 'Team (Premium Seat)')) ? 5 : 1}
                   value={tool.seats}
                   onChange={(e) => handleToolChange(tool.id, 'seats', e.target.value)}
                   className={inputCls}

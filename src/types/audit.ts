@@ -19,14 +19,14 @@ export type UseCase =
 
 // ─── Plan Definitions ─────────────────────────────────────────────────────────
 
-export type CursorPlan    = "Hobby" | "Pro" | "Pro+" | "Business" | "Enterprise";
-export type CopilotPlan   = "Free" | "Individual" | "Pro+" | "Business" | "Enterprise";
-export type ClaudePlan    = "Free" | "Pro" | "Team" | "Enterprise";
-export type ChatGPTPlan   = "Free" | "Plus" | "Pro" | "Team" | "Enterprise";
-export type AnthropicApiPlan = "Pay-as-you-go";
-export type OpenAiApiPlan    = "Pay-as-you-go";
-export type GeminiPlan    = "Free" | "Advanced" | "Business" | "Enterprise";
-export type WindsurfPlan  = "Free" | "Pro" | "Teams" | "Enterprise";
+export type CursorPlan    = "Hobby" | "Pro" | "Business" | "Enterprise";
+export type CopilotPlan   = "Individual" | "Business" | "Enterprise";
+export type ClaudePlan    = "Free" | "Pro" | "Team (Standard Seat)" | "Team (Premium Seat)" | "Enterprise" | "API Direct";
+export type ChatGPTPlan   = "Plus" | "Team" | "Enterprise" | "API Direct";
+export type AnthropicApiPlan = "API Direct";
+export type OpenAiApiPlan    = "API Direct";
+export type GeminiPlan    = "Free" | "Plus" | "Pro" | "Ultra" | "API Direct";
+export type WindsurfPlan  = "Free" | "Pro" | "Max" | "Teams" | "Enterprise";
 
 export type PlanName =
   | CursorPlan

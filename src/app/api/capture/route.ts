@@ -14,6 +14,8 @@ interface CapturePayload {
   email: string;
   /** Optional company name. */
   companyName?: string;
+  /** Optional user role. */
+  role?: string;
   /** Total headcount from the spend form. */
   teamSize: number;
   /** Aggregated monthly savings from the audit engine. */
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // ── 3. Basic validation ──────────────────────────────────────────────────────
-    const { email, companyName, teamSize, totalMonthlySavings, auditData } = body;
+    const { email, companyName, role, teamSize, totalMonthlySavings, auditData } = body;
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ error: "A valid email is required." }, { status: 422 });
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toLeadRow({
           email,
           companyName: companyName ?? null,
+          role: role ?? null,
           teamSize,
           totalMonthlySavings,
           auditData,
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
       const { error: emailError } = await resend.emails.send({
-        from: "Lumen <noreply@lumen.app>",
+        from: "Lumen <audit@aryansharma.dev>",
         to: [email],
         subject: `Your AI Spend Audit is saved — ${formattedSavings}/mo in potential savings`,
         html: buildEmailHtml({

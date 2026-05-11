@@ -44,6 +44,7 @@ export function getSupabase(): SupabaseClient {
  *   id                uuid        PRIMARY KEY DEFAULT gen_random_uuid()
  *   email             text        NOT NULL
  *   company_name      text
+ *   role              text
  *   team_size         integer     NOT NULL
  *   total_monthly_savings numeric NOT NULL
  *   audit_data        jsonb       NOT NULL
@@ -55,6 +56,8 @@ export interface Lead {
   email: string;
   /** Optional company / org name provided by the user. */
   companyName: string | null;
+  /** Optional job title / role provided by the user. */
+  role: string | null;
   /** Total headcount entered in the spend form. */
   teamSize: number;
   /** Sum of all per-tool monthly savings from the audit engine. */
@@ -81,6 +84,7 @@ export function toLeadRow(lead: NewLead): Record<string, unknown> {
   return {
     email: lead.email,
     company_name: lead.companyName,
+    role: lead.role,
     team_size: lead.teamSize,
     total_monthly_savings: lead.totalMonthlySavings,
     audit_data: lead.auditData,

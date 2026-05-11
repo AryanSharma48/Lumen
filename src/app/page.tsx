@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useState } from 'react'
 import { AuroraBackground } from '@/components/ui/aurora-background'
 import SpendForm from '@/components/SpendForm'

@@ -13,8 +13,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lumen",
-  description: "Audit your team's AI spend, identify overlaps, and find verifiable savings across ChatGPT, Claude, Cursor, and more.",
+  title: "Lumen | The AI Spend Audit Engine for High-Growth Teams",
+  description: "Analyze your team's AI tool spend, identify overlaps, and find verifiable savings across ChatGPT, Claude, Cursor, and more in under 2 minutes.",
+  openGraph: {
+    title: "Lumen | The AI Spend Audit Engine for High-Growth Teams",
+    description: "Analyze your team's AI tool spend, identify overlaps, and find verifiable savings across ChatGPT, Claude, Cursor, and more in under 2 minutes.",
+    url: "https://lumenaudit.vercel.app",
+    siteName: "Lumen",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Lumen AI Spend Audit",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lumen | The AI Spend Audit Engine for High-Growth Teams",
+    description: "Analyze your team's AI tool spend, identify overlaps, and find verifiable savings across ChatGPT, Claude, Cursor, and more in under 2 minutes.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({

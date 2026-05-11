@@ -25,15 +25,15 @@ import type {
 // null = custom / negotiated — we cannot compute savings for these tiers.
 
 export const TOOL_PRICING: Record<string, Record<string, number | null>> = {
-  "Cursor":         { "Hobby": 0,  "Pro": 20, "Pro+": 60, "Business": 40, "Enterprise": null },
-  "GitHub Copilot": { "Free": 0,   "Individual": 10, "Pro+": 39, "Business": 19, "Enterprise": 39 },
-  "Claude":         { "Free": 0,   "Pro": 20, "Team": 30, "Enterprise": null },
-  "ChatGPT":        { "Free": 0,   "Plus": 20, "Pro": 200, "Team": 30, "Enterprise": null },
-  "Windsurf":       { "Free": 0,   "Pro": 20, "Teams": 40, "Enterprise": null },
+  "Cursor":         { "Hobby": 0,  "Pro": 20, "Business": 40, "Enterprise": null },
+  "GitHub Copilot": { "Individual": 10, "Business": 19, "Enterprise": 39 },
+  "Claude":         { "Free": 0,   "Pro": 20, "Team (Standard Seat)": 25, "Team (Premium Seat)": 125, "Enterprise": null, "API Direct": 0 },
+  "ChatGPT":        { "Plus": 20, "Team": 30, "Enterprise": null, "API Direct": 0 },
+  "Windsurf":       { "Free": 0,   "Pro": 20, "Max": 200, "Teams": 40, "Enterprise": null },
   // API tools — pricing recorded for reference; engine uses monthlySpend directly.
-  "Anthropic API":  { "Pay-as-you-go": 0 },
-  "OpenAI API":     { "Pay-as-you-go": 0 },
-  "Gemini":         { "Free": 0,   "Advanced": 19.99 },
+  "Anthropic API":  { "API Direct": 0 },
+  "OpenAI API":     { "API Direct": 0 },
+  "Gemini":         { "Free": 0,   "Plus": 7.99, "Pro": 19.99, "Ultra": 249.99, "API Direct": 0 },
 };
 
 // ─── Rule Thresholds ─────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function ruleSoloOverkill(tool: ToolState): AuditResult | null {
 
   const teamTierTools: Record<string, { teamPlan: string; cheaperPlan: PlanName; cheaperPrice: number }> = {
     "ChatGPT": { teamPlan: "Team", cheaperPlan: "Plus", cheaperPrice: 20 },
-    "Claude":  { teamPlan: "Team", cheaperPlan: "Pro",  cheaperPrice: 20 },
+    "Claude":  { teamPlan: "Team (Standard Seat)", cheaperPlan: "Pro",  cheaperPrice: 20 },
   };
 
   const match = teamTierTools[name];
@@ -213,8 +213,8 @@ function ruleCopilotRedundancy(
     const n = resolveName(t);
     const p = resolvePlan(t);
     return (
-      (n === "ChatGPT" && (p === "Plus" || p === "Pro" || p === "Team" || p === "Enterprise")) ||
-      (n === "Claude"  && (p === "Pro"  || p === "Team" || p === "Enterprise"))
+      (n === "ChatGPT" && (p === "Plus" || p === "Team" || p === "Enterprise")) ||
+      (n === "Claude"  && (p === "Pro"  || p === "Team (Standard Seat)" || p === "Team (Premium Seat)" || p === "Enterprise"))
     );
   });
   if (!premiumLLM) return null;

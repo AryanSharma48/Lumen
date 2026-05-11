@@ -13,7 +13,7 @@
 | Business | $40 / user / month *(centralized billing required)* |
 | Enterprise | Custom pricing |
 
-*Source: https://cursor.sh/pricing*
+*Source: https://cursor.com/pricing*
 
 ---
 
@@ -35,10 +35,12 @@
 |---|---|
 | Free | $0 / user / month |
 | Pro | $20 / user / month |
-| Team | $30 / user / month *(minimum 5 users)* |
+| Team (Standard Seat) | $25 / user / month *(monthly billing, minimum 5 seats)* |
+| Team (Premium Seat) | $125 / user / month *(monthly billing, 5x usage, minimum 5 seats)* |
 | Enterprise | Custom pricing |
+| API Direct | Usage-based |
 
-*Source: https://anthropic.com/pricing*
+*Source: https://claude.com/pricing*
 
 ---
 
@@ -86,7 +88,10 @@
 | Tier | Price |
 |---|---|
 | Free | $0 / user / month |
-| Advanced (Google One AI Premium) | $19.99 / user / month |
+| Plus | $7.99 / user / month |
+| Pro | $19.99 / user / month |
+| Ultra | $249.99 / user / month |
+| API Direct | Usage-based |
 
 **Gemini API (Usage-Based):**
 
@@ -95,7 +100,7 @@
 | Gemini 1.5 Pro | $1.25 | $5.00 |
 | Gemini 1.5 Flash | $0.075 | $0.30 |
 
-*Source: https://gemini.google.com/advanced*
+*Source: https://gemini.google/us/subscriptions/?hl=en*
 
 ---
 

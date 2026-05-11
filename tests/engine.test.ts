@@ -36,17 +36,17 @@ function makeTool(overrides: Partial<ToolState> = {}): ToolState {
 describe("TOOL_PRICING constant", () => {
   it("exports the exact prices specified in the task", () => {
     expect(TOOL_PRICING["Cursor"]["Pro"]).toBe(20);
-    expect(TOOL_PRICING["Cursor"]["Pro+"]).toBe(60);
     expect(TOOL_PRICING["Cursor"]["Business"]).toBe(40);
     expect(TOOL_PRICING["GitHub Copilot"]["Individual"]).toBe(10);
     expect(TOOL_PRICING["GitHub Copilot"]["Business"]).toBe(19);
     expect(TOOL_PRICING["GitHub Copilot"]["Enterprise"]).toBe(39);
     expect(TOOL_PRICING["Claude"]["Pro"]).toBe(20);
-    expect(TOOL_PRICING["Claude"]["Team"]).toBe(30);
+    expect(TOOL_PRICING["Claude"]["Team (Standard Seat)"]).toBe(25);
+    expect(TOOL_PRICING["Claude"]["Team (Premium Seat)"]).toBe(125);
     expect(TOOL_PRICING["ChatGPT"]["Plus"]).toBe(20);
-    expect(TOOL_PRICING["ChatGPT"]["Pro"]).toBe(200);
     expect(TOOL_PRICING["ChatGPT"]["Team"]).toBe(30);
     expect(TOOL_PRICING["Windsurf"]["Pro"]).toBe(20);
+    expect(TOOL_PRICING["Windsurf"]["Max"]).toBe(200);
     expect(TOOL_PRICING["Windsurf"]["Teams"]).toBe(40);
   });
 });
@@ -96,13 +96,13 @@ describe("Rule 1 — Solo Overkill", () => {
     expect(results[0].recommendedPlan).toBe("Plus");
   });
 
-  it("flags a solo user on Claude Team and recommends Pro, saving $10", () => {
+  it("flags a solo user on Claude Team and recommends Pro, saving $5", () => {
     const { results } = runAudit(
       makeTeam({ teamSize: 1 }),
-      [makeTool({ name: "Claude", toolName: "Claude", plan: "Team", planName: "Team", monthlySpend: 30, seats: 1 })]
+      [makeTool({ name: "Claude", toolName: "Claude", plan: "Team (Standard Seat)", planName: "Team (Standard Seat)", monthlySpend: 25, seats: 1 })]
     );
     expect(results[0].recommendedAction).toBe("DOWNGRADE_PLAN");
-    expect(results[0].monthlySavings).toBe(10);
+    expect(results[0].monthlySavings).toBe(5);
     expect(results[0].recommendedPlan).toBe("Pro");
   });
 
@@ -170,7 +170,7 @@ describe("Rule 3 — Copilot + Premium LLM Redundancy", () => {
     // $78 + $400 = $478 → Cursor Business $80 = $398 savings ✓
     const tools: ToolState[] = [
       makeTool({ id: "cop", name: "GitHub Copilot", toolName: "GitHub Copilot", plan: "Enterprise", planName: "Enterprise", monthlySpend: 78, seats: 2 }),
-      makeTool({ id: "gpt", name: "ChatGPT",        toolName: "ChatGPT",        plan: "Pro",        planName: "Pro",        monthlySpend: 400, seats: 2 }),
+      makeTool({ id: "gpt", name: "ChatGPT",        toolName: "ChatGPT",        plan: "Team",        planName: "Team",        monthlySpend: 60, seats: 2 }),
     ];
     const { results } = runAudit(makeTeam({ teamSize: 2, primaryUseCase: "coding" }), tools);
     const redundancyResult = results.find((r) => r.recommendedAction === "REMOVE_REDUNDANCY");
@@ -195,7 +195,7 @@ describe("Rule 4 — API Efficiency", () => {
   it("flags Anthropic API spend > $100 for a data team and estimates 50% savings", () => {
     const { results } = runAudit(
       makeTeam({ teamSize: 5, primaryUseCase: "data" }),
-      [makeTool({ name: "Anthropic API", toolName: "Anthropic API", plan: "Pay-as-you-go", planName: "Pay-as-you-go", monthlySpend: 400, seats: 1 })]
+      [makeTool({ name: "Anthropic API", toolName: "Anthropic API", plan: "API Direct", planName: "API Direct", monthlySpend: 400, seats: 1 })]
     );
     expect(results[0].recommendedAction).toBe("API_EFFICIENCY");
     expect(results[0].monthlySavings).toBe(200);
@@ -204,7 +204,7 @@ describe("Rule 4 — API Efficiency", () => {
   it("flags OpenAI API spend > $100 for a research team", () => {
     const { results } = runAudit(
       makeTeam({ teamSize: 3, primaryUseCase: "research" }),
-      [makeTool({ name: "OpenAI API", toolName: "OpenAI API", plan: "Pay-as-you-go", planName: "Pay-as-you-go", monthlySpend: 300, seats: 1 })]
+      [makeTool({ name: "OpenAI API", toolName: "OpenAI API", plan: "API Direct", planName: "API Direct", monthlySpend: 300, seats: 1 })]
     );
     expect(results[0].recommendedAction).toBe("API_EFFICIENCY");
     expect(results[0].monthlySavings).toBe(150);
@@ -213,7 +213,7 @@ describe("Rule 4 — API Efficiency", () => {
   it("does NOT flag API spend <= $100", () => {
     const { results } = runAudit(
       makeTeam({ teamSize: 2, primaryUseCase: "data" }),
-      [makeTool({ name: "Anthropic API", toolName: "Anthropic API", plan: "Pay-as-you-go", planName: "Pay-as-you-go", monthlySpend: 80, seats: 1 })]
+      [makeTool({ name: "Anthropic API", toolName: "Anthropic API", plan: "API Direct", planName: "API Direct", monthlySpend: 80, seats: 1 })]
     );
     expect(results[0].recommendedAction).toBe("OPTIMAL");
   });
@@ -221,7 +221,7 @@ describe("Rule 4 — API Efficiency", () => {
   it("does NOT flag API spend for a coding team", () => {
     const { results } = runAudit(
       makeTeam({ teamSize: 5, primaryUseCase: "coding" }),
-      [makeTool({ name: "OpenAI API", toolName: "OpenAI API", plan: "Pay-as-you-go", planName: "Pay-as-you-go", monthlySpend: 500, seats: 1 })]
+      [makeTool({ name: "OpenAI API", toolName: "OpenAI API", plan: "API Direct", planName: "API Direct", monthlySpend: 500, seats: 1 })]
     );
     expect(results[0].recommendedAction).not.toBe("API_EFFICIENCY");
   });
@@ -235,7 +235,7 @@ describe("runAudit — aggregate savings", () => {
     // Rule 4: Anthropic API $400 for data → $200 savings
     const tools: ToolState[] = [
       makeTool({ id: "t1", name: "ChatGPT",      toolName: "ChatGPT",      plan: "Team",          planName: "Team",          monthlySpend: 30,  seats: 1 }),
-      makeTool({ id: "t2", name: "Anthropic API", toolName: "Anthropic API", plan: "Pay-as-you-go", planName: "Pay-as-you-go", monthlySpend: 400, seats: 1 }),
+      makeTool({ id: "t2", name: "Anthropic API", toolName: "Anthropic API", plan: "API Direct", planName: "API Direct", monthlySpend: 400, seats: 1 }),
     ];
     const report = runAudit(makeTeam({ teamSize: 1, primaryUseCase: "data" }), tools);
     expect(report.totalMonthlySavings).toBe(210);
@@ -243,7 +243,7 @@ describe("runAudit — aggregate savings", () => {
   });
 
   it("totalAnnualSavings is always 12× totalMonthlySavings", () => {
-    const tools = [makeTool({ monthlySpend: 500, seats: 10, plan: "Pro+", planName: "Pro+" })];
+    const tools = [makeTool({ monthlySpend: 500, seats: 10, plan: "Business", planName: "Business" })];
     const report = runAudit(makeTeam(), tools);
     expect(report.totalAnnualSavings).toBe(report.totalMonthlySavings * 12);
   });

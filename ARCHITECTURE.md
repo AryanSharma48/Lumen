@@ -6,7 +6,7 @@
 The current architecture is optimized for speed of delivery and low operational overhead (< 500 audits/day).
 - **Compute:** Next.js App Router (Serverless).
 - **Database:** Supabase (PostgreSQL).
-- **Abuse Protection:** A silent, client-side honeypot field (`_hp`) on the capture form to trap automated scrapers.
+- **Abuse Protection:** A silent, client-side honeypot field (`_hp`) on the capture form. Chosen because it provides frictionless protection against basic scraping bots without degrading the user experience (like hCaptcha) or requiring external infrastructure (like Redis rate-limiting) during the MVP validation phase.
 
 ## Scaling to 10k Audits/Day
 If traffic scales to 10,000 audits per day (approx. 7 requests per minute, but highly prone to viral spikes), the current architecture will experience database connection exhaustion, LLM API rate-limiting, and vulnerability to distributed scraping bots. Here is the evolution plan:

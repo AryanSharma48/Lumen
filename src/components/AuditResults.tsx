@@ -49,6 +49,8 @@ function EmailCapture({
   team?: TeamData
 }) {
   const [email, setEmail] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [role, setRole] = useState('')
   const [hp, setHp] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
 
@@ -64,6 +66,8 @@ function EmailCapture({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
+          companyName: companyName || undefined,
+          role: role || undefined,
           teamSize: team?.teamSize ?? 1,
           totalMonthlySavings,
           auditData: results,
@@ -93,7 +97,7 @@ function EmailCapture({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-2 sm:flex-row sm:items-center"
+      className="flex flex-col gap-2"
       aria-label={label}
     >
       <label htmlFor={id} className="sr-only">{label}</label>
@@ -104,6 +108,22 @@ function EmailCapture({
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder={placeholder}
+        disabled={status === 'loading'}
+        className="flex-1 rounded-lg border border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+      />
+      <input
+        type="text"
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        placeholder="Company Name (Optional)"
+        disabled={status === 'loading'}
+        className="flex-1 rounded-lg border border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+      />
+      <input
+        type="text"
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        placeholder="Your Role (Optional)"
         disabled={status === 'loading'}
         className="flex-1 rounded-lg border border-zinc-200 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
       />
@@ -412,7 +432,7 @@ export default function AuditResults({ team, results, totalMonthlySavings, onRes
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="text-center text-xs text-zinc-400">
-        Pricing data verified 2026-05-08 · Results are estimates based on public pricing pages.
+        Pricing data verified 2026-05-12 · Results are estimates based on public pricing pages.
       </footer>
     </div>
   )

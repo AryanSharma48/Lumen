@@ -48,8 +48,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     maximumFractionDigits: 0,
   }).format(lead.totalMonthlySavings);
 
-  const title = `I just found ${formattedSavings}/mo in AI tool savings`;
-  const description = "Check out my AI spend audit and see how much your team could save by optimizing your stack.";
+  const title = `I just found ${formattedSavings}/mo in potential AI tool savings with Lumen`;
+  const description = "Analyze your team's AI tool spend and find hidden savings in minutes. Join 500+ teams who have optimized their stack with our data-driven audit engine.";
 
   return {
     title,
@@ -58,11 +58,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       type: "website",
+      images: [
+        {
+          url: "/og-image.png",
+          width: 1200,
+          height: 630,
+          alt: "Lumen AI Spend Audit Result",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: ["/og-image.png"],
     },
   };
 }
