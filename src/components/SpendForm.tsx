@@ -78,7 +78,7 @@ function reducer(state: FormState, action: Action): FormState {
       return action.payload
 
     case 'SET_TEAM_SIZE':
-      return { ...state, team: { ...state.team, teamSize: action.payload as any } }
+      return { ...state, team: { ...state.team, teamSize: action.payload as unknown as number } }
 
     case 'SET_USE_CASE':
       return { ...state, team: { ...state.team, useCase: action.payload, primaryUseCase: action.payload } }
@@ -114,7 +114,7 @@ function reducer(state: FormState, action: Action): FormState {
         if (recalculateSpend) {
           const price = TOOL_PRICING[updated.name]?.[updated.plan]
           if (price != null) {
-            const currentSeats = (updated.seats as any) === '' ? 1 : Number(updated.seats)
+            const currentSeats = (updated.seats as unknown as string) === '' ? 1 : Number(updated.seats)
             updated.monthlySpend = price * currentSeats
           }
         }
@@ -173,7 +173,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
     (id: string, field: keyof ToolState, raw: string) => {
       const numericFields: (keyof ToolState)[] = ['monthlySpend', 'seats']
       const value = numericFields.includes(field) ? (raw === '' ? '' : parseFloat(raw)) : raw
-      dispatch({ type: 'UPDATE_TOOL', id, field, value: value as any })
+      dispatch({ type: 'UPDATE_TOOL', id, field, value: value as never })
     },
     []
   )
@@ -184,12 +184,12 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
       ...state,
       team: {
         ...state.team,
-        teamSize: (state.team.teamSize as any) === '' ? 1 : Math.max(1, Number(state.team.teamSize)),
+        teamSize: (state.team.teamSize as unknown as string) === '' ? 1 : Math.max(1, Number(state.team.teamSize)),
       },
       tools: state.tools.map((t) => ({
         ...t,
-        monthlySpend: (t.monthlySpend as any) === '' ? 0 : Number(t.monthlySpend),
-        seats: (t.seats as any) === '' ? 1 : Number(t.seats),
+        monthlySpend: (t.monthlySpend as unknown as string) === '' ? 0 : Number(t.monthlySpend),
+        seats: (t.seats as unknown as string) === '' ? 1 : Number(t.seats),
       })),
     }
     onSubmit(normalizedState)
@@ -201,7 +201,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6" noValidate>
 
       {/* ── Team Section ─────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <section className="glass-panel p-6">
         <h2 className="mb-4 text-base font-semibold text-zinc-900">Your Team</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -236,7 +236,7 @@ export default function SpendForm({ onSubmit }: SpendFormProps) {
       </section>
 
       {/* ── Tools Section ─────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <section className="glass-panel p-6">
         <h2 className="mb-1 text-base font-semibold text-zinc-900">AI Tool Subscriptions</h2>
         <p className="mb-4 text-sm text-zinc-500">
           Add every AI tool your team pays for, even partially.

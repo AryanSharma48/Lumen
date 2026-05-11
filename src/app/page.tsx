@@ -1,6 +1,8 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
+import { AuroraBackground } from '@/components/ui/aurora-background'
 import SpendForm from '@/components/SpendForm'
 import AuditResults from '@/components/AuditResults'
 import { runAudit } from '@/lib/engine'
@@ -19,11 +21,11 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50">
+    <AuroraBackground>
       {report === null ? (
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900">
+            <h1 className="flex items-center justify-center gap-3 text-4xl font-extrabold tracking-tight text-zinc-900">
               Lumen
             </h1>
             <p className="mt-2 text-zinc-500">Audit your AI spend. Find what you&apos;re wasting.</p>
@@ -38,6 +40,6 @@ export default function Home() {
           onReset={handleReset}
         />
       )}
-    </main>
+    </AuroraBackground>
   )
 }
