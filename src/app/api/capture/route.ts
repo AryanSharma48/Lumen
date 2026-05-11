@@ -198,10 +198,24 @@ function buildEmailHtml({
         <p style="margin:24px 0 8px;font-size:15px;line-height:1.6;color:#a3a3a3;">
           Your audit report is ready to share. Use the link below:
         </p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/r/${leadId}"
-           style="display:inline-block;margin:8px 0 24px;padding:12px 24px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">
-          View Your Report →
-        </a>
+        <!-- Bulletproof Button -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+          <tr>
+            <td align="left">
+              <table border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="border-radius: 8px;" bgcolor="#6366f1">
+                    <a href="${(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").startsWith('http') ? "" : "https://"}${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/r/${leadId}"
+                       target="_blank"
+                       style="font-size: 14px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 32px; border: 1px solid #6366f1; display: inline-block; font-weight: 600; background-color: #6366f1; background-image: linear-gradient(135deg,#6366f1,#a855f7);">
+                      View Your Report &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
         <p style="margin:0;font-size:13px;color:#4b5563;line-height:1.6;">
           Questions? Reply to this email and we'll get back to you within one business day.
         </p>
