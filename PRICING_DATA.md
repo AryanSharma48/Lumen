@@ -1,6 +1,6 @@
 # Pricing Data
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-12
 
 ---
 

@@ -1,24 +1,46 @@
 # Architecture
 
-# Architecture & Scaling Strategy
+## System Diagram
 
-## Current MVP State
-The current architecture is optimized for speed of delivery and low operational overhead (< 500 audits/day).
-- **Compute:** Next.js App Router (Serverless).
-- **Database:** Supabase (PostgreSQL).
-- **Abuse Protection:** A silent, client-side honeypot field (`_hp`) on the capture form. Chosen because it provides frictionless protection against basic scraping bots without degrading the user experience (like hCaptcha) or requiring external infrastructure (like Redis rate-limiting) during the MVP validation phase.
+```mermaid
+graph TD
+    User([User]) --> UI[Next.js Frontend]
+    UI --> Engine[Audit Engine /lib/engine.ts]
+    Engine --> UI
+    UI --> API_Capture[/api/capture]
+    UI --> API_Summary[/api/summary]
+    
+    API_Capture --> DB[(Supabase Postgres)]
+    API_Capture --> Email[Resend API]
+    API_Summary --> AI[Google Gemini 2.5 Flash]
+    
+    Email --> User
+    DB --> SharedReport[Shared Report /r/id]
+    SharedReport --> User
+```
 
-## Scaling to 10k Audits/Day
-If traffic scales to 10,000 audits per day (approx. 7 requests per minute, but highly prone to viral spikes), the current architecture will experience database connection exhaustion, LLM API rate-limiting, and vulnerability to distributed scraping bots. Here is the evolution plan:
+## Data Flow: From Input to Audit
 
-### 1. Edge-Based Rate Limiting
-The silent honeypot is insufficient against coordinated botnets. At 10k requests/day, I would implement **Upstash Redis** rate limiting at the Next.js Edge middleware layer.
-* **Impact:** Blocks malicious IPs *before* they invoke the Serverless function, protecting both Supabase connection limits and Resend API email quotas from exhaustion attacks.
+Lumen operates on a "Math-First, AI-Second" architecture to ensure zero latency and 100% accuracy:
 
-### 2. Decoupling the LLM via Message Queues
-Currently, the `/api/summary` route synchronously awaits the Gemini API response. At high volume, downstream LLM latency spikes will cause Vercel serverless functions to hang and timeout.
-* **Impact:** Migrate the LLM call to an asynchronous background worker (e.g., Inngest or Upstash QStash). The UI would immediately render the deterministic math, and the AI summary skeleton would poll or use Server-Sent Events (SSE) to stream in once the background job completes.
+1.  **Reactive Input:** As users fill out the `SpendForm`, the state is managed via a React Reducer.
+2.  **Deterministic Engine:** Every keystroke triggers the `engine.ts` audit logic. Since pricing is hard-coded into the engine, we achieve sub-millisecond calculation speed without network round-trips.
+3.  **Secure Persistence:** When the user clicks "Save," the data is POSTed to `/api/capture`, which validates the payload, checks for bots via a silent honeypot, and persists the lead to **Supabase**.
+4.  **AI Enrichment:** Simultaneously, `/api/summary` sends the audit findings to **Google Gemini**. The AI analyzes the specific tool combinations to generate a unique, non-generic executive summary.
+5.  **Viral Delivery:** Finally, **Resend** sends a transactional email containing a unique link to the public report (`/r/[id]`), enabling the viral loop.
 
-### 3. Database Caching for Viral Reads
-Currently, the public report route (`/r/[id]`) queries Supabase directly on every page load. Because the MVP uses the `@supabase/supabase-js` client (which operates over the HTTP PostgREST API), we are actually protected from the TCP connection exhaustion typical of serverless functions—meaning PgBouncer is not required for the current architecture. However, viral traffic will still hammer the REST API with redundant read queries.
-* **Impact:** Implement Next.js Data Cache (`force-cache` with revalidation) or an Edge cache (Upstash Redis) for public report reads (`/r/[id]`). This prevents excessive database egress and drastically lowers latency for global users viewing viral reports.
+## Why This Stack?
+
+-   **Next.js (App Router):** Chosen for its superior SEO capabilities and the ability to colocate serverless API routes with high-performance UI components.
+-   **Supabase:** Provided a production-ready PostgreSQL database with zero infrastructure management, allowing us to move from prototype to production in days.
+-   **Gemini 2.5 Flash:** Selected for its extremely low latency and reasoning capabilities, which allow it to analyze complex SaaS spend patterns and generate strategic advice while maintaining high performance.
+-   **Resend:** The modern standard for transactional email, chosen for its developer-friendly API and reliable deliverability into primary inboxes.
+
+## Scaling Strategy (10k+ Audits/Day)
+
+While the current MVP is highly performant, scaling to 10k audits/day would require the following evolutions:
+
+1.  **Edge Rate Limiting:** Implement **Upstash Redis** at the Next.js Middleware layer. This blocks malicious scrapers at the edge before they can consume serverless execution time or DB connections.
+2.  **Asynchronous Summaries:** Currently, the AI summary is generated synchronously. At scale, we would move this to a background job (e.g., **Inngest**). The user would see the math immediately, and the AI summary would stream in via Server-Sent Events (SSE).
+3.  **Result Caching:** Viral shared reports (`/r/[id]`) should be cached using **Next.js Data Cache** or a CDN. This prevents the database from being hammered by redundant read requests during high-traffic spikes.
+4.  **Connection Pooling:** As PostgreSQL connections scale, we would introduce **Supabase Connection Pooling** (PgBouncer) to prevent the "too many clients" error common in serverless environments.

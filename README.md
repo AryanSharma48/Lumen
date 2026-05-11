@@ -1,46 +1,76 @@
 # Lumen
 
->**Live Demo:** [https://lumenaudit.vercel.app](https://lumenaudit.vercel.app)
+> **Live Demo:** [https://lumenaudit.vercel.app](https://lumenaudit.vercel.app)
 
-Lumen is a lead-generation tool that helps startup founders and engineering managers analyze their AI subscriptions, identify overspending, and find cheaper alternatives.
+Lumen is an AI spend intelligence engine designed for startup founders and engineering managers. It helps teams audit their current AI tool stack (ChatGPT, Claude, Cursor, etc.), identify costly overlaps, and generate a mathematically defensible consolidation plan to save thousands in monthly SaaS spend.
 
-## Getting Started Locally
+## 🖼️ Screenshots
 
-Follow these instructions to clone and run the application on your local machine.
+<div align="center">
+  <p align="center"><strong>Lumen Landing Page</strong></p>
+  <img src="public/landingpage.png" width="800" alt="Lumen Landing Page" />
+  <br/><br/>
+  <p align="center"><strong>Dynamic Tool Selection</strong></p>
+  <img src="public/tool-selection.png" width="800" alt="Lumen Tool Selection" />
+  <br/><br/>
+  <p align="center"><strong>AI-Powered Savings Report</strong></p>
+  <img src="public/report.png" width="800" alt="Lumen Savings Report" />
+  <br/><br/>
+  <p align="center"><strong>Lighthouse Performance Scores</strong></p>
+  <img src="public/lighthousescores.jpeg" width="800" alt="Lumen Performance" />
+</div>
 
-### 1. Environment Variables
+## 🚀 Quick Start
 
-This project requires a few external services to function. You will need API keys for Supabase, Google Gemini, and Resend.
+### 1. Prerequisites
+You will need API keys for the following services:
+- **Supabase:** For lead storage.
+- **Google Gemini:** For AI-powered audit summaries.
+- **Resend:** For transactional email delivery.
 
-Copy the provided example file to create your local environment file:
+### 2. Setup
+Clone the repository and install dependencies:
+```bash
+git clone https://github.com/AryanSharma48/Lumen.git
+cd Lumen
+npm install
+```
+
+### 3. Environment Variables
+Copy the example file and fill in your keys:
 ```bash
 cp .env.example .env.local
 ```
 
-You **must** populate `.env.local` with the following variables (matching the exact keys found in `.env.example`):
-
-| Variable | Description |
-| :--- | :--- |
-| `SUPABASE_URL` | Your Supabase Project URL (Dashboard → Project Settings → API). |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase Service Role Key for backend access. |
-| `GEMINI_API_KEY` | Your Google AI Studio API Key. |
-| `RESEND_API_KEY` | Your Resend API key for transactional emails. |
-| `NEXT_PUBLIC_APP_URL` | The base URL used in email templates. Use `http://localhost:3000` locally. |
-
-### 2. Installation & Startup
-
-Once your environment variables are configured, install the dependencies and start the development server:
-
+### 4. Run Locally
 ```bash
-npm install
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) to see your app.
 
-The application will spin up and be accessible at [http://localhost:3000](http://localhost:3000).
+### 5. Deploy
+The easiest way to deploy this application is via Vercel. 
+Ensure your project is pushed to a GitHub repository, then:
+1. Import the repository into your Vercel dashboard.
+2. Add the required environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `RESEND_API_KEY`,`NEXT_PUBLIC_APP_URL`).
+3. Click **Deploy**. Vercel will automatically detect the Next.js framework and handle the build.
 
-### Available Scripts
+## 🏗️ Technical Decisions
 
-- `npm run dev` - Starts the local development server.
-- `npm run build` - Builds the Next.js application for production.
-- `npm run test` - Runs the Vitest test suite.
-- `npm run lint` - Runs ESLint against the codebase.
+| Decision | Trade-off | Rationale |
+| :--- | :--- | :--- |
+| **App Router** | Over SSR/CSR | Leveraged Next.js 15 App Router to achieve a high-performance, SEO-optimized viral loop for shared reports. |
+| **Hard-coded Engine** | Over DB Pricing | Chose hard-coded pricing logic for sub-millisecond audit calculations and 100% deterministic results without DB latency. |
+| **Honeypot Protection** | Over Captcha | Implemented a silent `_hp` field for bot protection. This ensures a zero-friction UX for leads while preventing automated spam. |
+| **React Reducers** | Over Global State | Used `useReducer` for the 12-column spend form to keep complex state co-located and avoid the overhead of libraries like Redux/Zustand. |
+| **Resend Integration** | Over SMTP | Integrated Resend for transactional emails to ensure high deliverability and easy management of dynamic HTML audit summaries. |
+
+## 🛠️ Built With
+- **Framework:** Next.js (TypeScript)
+- **Styling:** Tailwind CSS + Framer Motion
+- **Database:** Supabase (PostgreSQL)
+- **Email:** Resend
+- **AI Engine:** Gemini
+
+---
+© 2026 Lumen. Designed for the AI-first workforce.
