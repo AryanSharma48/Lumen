@@ -154,6 +154,13 @@ function buildEmailHtml({
       </p>`
     : "";
 
+  // Handle URL protocols safely
+  const rawBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
+  const baseUrl = rawBaseUrl.startsWith("http") ? rawBaseUrl : `https://${rawBaseUrl}`;
+  // Final safety check: if the user has a typo like "htttps//", we'll just use it as is
+  // but ensure we don't add a redundant https:// if they already have one.
+
+
   return /* html */ `
 <!DOCTYPE html>
 <html lang="en">
@@ -205,7 +212,7 @@ function buildEmailHtml({
               <table border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="center" style="border-radius: 8px;" bgcolor="#6366f1">
-                    <a href="${(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").startsWith('http') ? "" : "https://"}${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/r/${leadId}"
+                    <a href="${baseUrl}/r/${leadId}"
                        target="_blank"
                        style="font-size: 14px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 32px; border: 1px solid #6366f1; display: inline-block; font-weight: 600; background-color: #6366f1; background-image: linear-gradient(135deg,#6366f1,#a855f7);">
                       View Your Report &rarr;
