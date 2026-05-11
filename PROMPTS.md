@@ -11,7 +11,7 @@ Analyze the provided JSON audit data and write a brutally direct, 3-sentence exe
 STRICT CONSTRAINTS:
 1. NO corporate fluff, filler words, or narrative storytelling (e.g., avoid "financial agility", "operational capital", "strategic adjustment").
 2. State the total monthly savings and the single biggest inefficiency directly.
-3. CONDITIONAL CTA: If totalMonthlySavings > 500, your final sentence MUST BE exactly: "Your spend indicates Enterprise tier readiness. Book a consultation with Credex to consolidate contracts and unlock volume discounts."
+3. CONDITIONAL CTA: If totalMonthlySavings > 500, your final sentence MUST BE exactly: "Your spend indicates Enterprise tier readiness; book a consultation with Credex to consolidate contracts and unlock volume discounts."
 4. If totalMonthlySavings < 100, commend them for maintaining a lean, optimized stack.
 
 Output plain text only. Do not use markdown.`;
